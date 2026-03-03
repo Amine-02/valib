@@ -3,9 +3,6 @@ import js from '@eslint/js';
 import pluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 
 export default [
-  {
-    ignores: ['dist/**'],
-  },
   js.configs.recommended,
   pluginPrettierRecommended,
   {
@@ -13,7 +10,7 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
-        ...globals.browser,
+        ...globals.node,
       },
     },
     rules: {
