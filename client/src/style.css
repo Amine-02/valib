@@ -266,4 +266,96 @@
   .sidebar {
     @apply border-border bg-surface border-r;
   }
+
+  .year-range-panel {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .year-range-top {
+    @apply grid grid-cols-[1fr_auto_1fr] items-end gap-2;
+  }
+
+  .year-range-field {
+    @apply min-w-0;
+  }
+
+  .year-range-caption {
+    @apply text-text-soft mb-1 text-[11px] font-medium;
+  }
+
+  .year-range-value {
+    @apply border-border bg-surface-muted text-text rounded-lg border px-2 py-1.5 text-center text-lg font-bold;
+  }
+
+  .year-range-separator {
+    @apply text-text-soft pb-1 text-lg font-semibold;
+  }
+
+  .year-range-sliders {
+    @apply relative mt-2 h-7;
+  }
+
+  .year-range-track {
+    @apply bg-primary-100 absolute top-1/2 left-0 h-1.5 w-full -translate-y-1/2 rounded-full;
+  }
+
+  .year-range-active {
+    @apply bg-primary-500 absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full;
+    left: 0;
+    width: 100%;
+  }
+
+  .year-range-input {
+    @apply absolute top-0 left-0 h-7 w-full bg-transparent;
+    appearance: none;
+    pointer-events: none;
+    border: 0;
+    padding: 0;
+  }
+
+  .year-range-input--from {
+    z-index: 20;
+  }
+
+  .year-range-input--to {
+    z-index: 30;
+  }
+
+  .year-range-input:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: transparent;
+  }
+
+  .year-range-input::-webkit-slider-runnable-track {
+    height: 6px;
+    background: transparent;
+  }
+
+  .year-range-input::-webkit-slider-thumb {
+    appearance: none;
+    pointer-events: auto;
+    height: 20px;
+    width: 20px;
+    border-radius: 9999px;
+    border: 3px solid var(--color-primary-300);
+    background: var(--color-surface);
+    box-shadow: 0 2px 8px rgba(22, 50, 79, 0.18);
+    margin-top: -7px;
+  }
+
+  .year-range-input::-moz-range-track {
+    height: 6px;
+    background: transparent;
+  }
+
+  .year-range-input::-moz-range-thumb {
+    pointer-events: auto;
+    height: 20px;
+    width: 20px;
+    border-radius: 9999px;
+    border: 3px solid var(--color-primary-300);
+    background: var(--color-surface);
+    box-shadow: 0 2px 8px rgba(22, 50, 79, 0.18);
+  }
 }

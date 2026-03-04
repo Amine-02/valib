@@ -1,32 +1,9 @@
 import { supabaseAdmin } from './supabaseClient.js';
+import { applyPagination } from '../utils/query.js';
 
 const ALLOWED_ACTIONS = ['checkout', 'checkin'];
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 500;
-
-function toPositiveInt(value) {
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
-function applyPagination(query, filters = {}) {
-  const hasPage = filters.page !== undefined;
-  const hasLimit = filters.limit !== undefined;
-
-  if (!hasPage && !hasLimit) return query;
-
-  const page = toPositiveInt(filters.page) ?? 1;
-  const limit = Math.min(
-    toPositiveInt(filters.limit) ?? DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE
-  );
-
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  return query.range(from, to);
-}
 
 function applyTransactionFilters(query, filters = {}) {
   let next = query;
@@ -51,7 +28,8 @@ export async function getAllBookTransactions(filters = {}) {
         .order('created_at', { ascending: false }),
       filters
     ),
-    filters
+    filters,
+    { defaultPageSize: DEFAULT_PAGE_SIZE, maxPageSize: MAX_PAGE_SIZE }
   );
 
   const { data, error } = await query;

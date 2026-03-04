@@ -1,30 +1,40 @@
 import { supabaseAdmin } from './supabaseClient.js';
+import {
+  applyPagination,
+  normalizeAscendingRange,
+  toIntInRange,
+} from '../utils/query.js';
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 500;
+const DEFAULT_SORT_FIELD = 'created_at';
+const DEFAULT_SORT_DIRECTION = 'desc';
+const MIN_PUBLISHED_YEAR = 1500;
+const MAX_PUBLISHED_YEAR = 2026;
+const SORTABLE_BOOK_FIELDS = new Set([
+  'id',
+  'title',
+  'author',
+  'genre',
+  'status',
+  'created_at',
+  'published_year',
+]);
 
-function toPositiveInt(value) {
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
+function applyBookSorting(query, filters = {}) {
+  const rawSort = String(filters.sort || DEFAULT_SORT_FIELD)
+    .trim()
+    .toLowerCase();
+  const sort = SORTABLE_BOOK_FIELDS.has(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
 
-function applyPagination(query, filters = {}) {
-  const hasPage = filters.page !== undefined;
-  const hasLimit = filters.limit !== undefined;
+  const rawDirection = String(
+    filters.direction || filters.order || DEFAULT_SORT_DIRECTION
+  )
+    .trim()
+    .toLowerCase();
+  const ascending = rawDirection === 'asc';
 
-  if (!hasPage && !hasLimit) return query;
-
-  const page = toPositiveInt(filters.page) ?? 1;
-  const limit = Math.min(
-    toPositiveInt(filters.limit) ?? DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE
-  );
-
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  return query.range(from, to);
+  return query.order(sort, { ascending });
 }
 
 function applyBookFilters(query, filters = {}) {
@@ -36,6 +46,35 @@ function applyBookFilters(query, filters = {}) {
 
   if (filters.genre) {
     next = next.ilike('genre', `%${filters.genre}%`);
+  }
+
+  const publishedYear = toIntInRange(filters.published_year, {
+    min: MIN_PUBLISHED_YEAR,
+    max: MAX_PUBLISHED_YEAR,
+  });
+  if (publishedYear !== null) {
+    next = next.eq('published_year', publishedYear);
+  }
+
+  let publishedYearFrom = toIntInRange(filters.published_year_from, {
+    min: MIN_PUBLISHED_YEAR,
+    max: MAX_PUBLISHED_YEAR,
+  });
+  let publishedYearTo = toIntInRange(filters.published_year_to, {
+    min: MIN_PUBLISHED_YEAR,
+    max: MAX_PUBLISHED_YEAR,
+  });
+  [publishedYearFrom, publishedYearTo] = normalizeAscendingRange(
+    publishedYearFrom,
+    publishedYearTo
+  );
+
+  if (publishedYearFrom !== null) {
+    next = next.gte('published_year', publishedYearFrom);
+  }
+
+  if (publishedYearTo !== null) {
+    next = next.lte('published_year', publishedYearTo);
   }
 
   if (filters.search) {
@@ -50,14 +89,12 @@ function applyBookFilters(query, filters = {}) {
 
 export async function getAllBooks(filters = {}) {
   const query = applyPagination(
-    applyBookFilters(
-      supabaseAdmin
-        .from('books')
-        .select('*')
-        .order('created_at', { ascending: false }),
+    applyBookSorting(
+      applyBookFilters(supabaseAdmin.from('books').select('*'), filters),
       filters
     ),
-    filters
+    filters,
+    { defaultPageSize: DEFAULT_PAGE_SIZE, maxPageSize: MAX_PAGE_SIZE }
   );
 
   const { data, error } = await query;
