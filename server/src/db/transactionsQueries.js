@@ -57,6 +57,7 @@ export async function createBookTransaction(transaction) {
         book_id: transaction.book_id,
         action: transaction.action,
         borrower_name: transaction.borrower_name ?? null,
+        borrower_phone: transaction.borrower_phone ?? null,
         notes: transaction.notes ?? null,
       },
     ])

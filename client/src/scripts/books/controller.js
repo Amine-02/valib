@@ -12,6 +12,7 @@ import { toTitleCase } from '/src/utils/string.js';
 
 const IDS = {
   addButton: 'books-add-button',
+  tableBody: 'books-table-body',
   prevButton: 'books-prev-page',
   nextButton: 'books-next-page',
   searchInput: 'books-search-input',
@@ -329,6 +330,7 @@ export function setupBooksController({
   state,
   loadBooksPage,
   openCreateModal,
+  onSelectBook,
   yearMin,
   yearMax,
   searchDebounceMs,
@@ -429,6 +431,39 @@ export function setupBooksController({
     bindOnce(el('addButton'), 'click', () => {
       if (typeof openCreateModal !== 'function') return;
       openCreateModal();
+    });
+  }
+
+  function buildRowBookFromDataset(row) {
+    if (!(row instanceof HTMLElement)) return null;
+
+    return {
+      id: String(row.dataset.bookId || '').trim(),
+      title: String(row.dataset.bookTitle || ''),
+      author: String(row.dataset.bookAuthor || ''),
+      published_year: String(row.dataset.bookPublishedYear || ''),
+      genre: String(row.dataset.bookGenre || ''),
+      status: String(row.dataset.bookStatus || ''),
+      cover_url: String(row.dataset.bookCoverUrl || ''),
+      borrower_name: String(row.dataset.bookBorrowerName || ''),
+      borrower_phone: String(row.dataset.bookBorrowerPhone || ''),
+    };
+  }
+
+  function bindRowSelection() {
+    const tableBody = el('tableBody');
+    bindOnce(tableBody, 'click', (event) => {
+      if (!(event.target instanceof Element)) return;
+      if (event.target.closest('button[data-action]')) return;
+
+      const row = event.target.closest('tr[data-book-row="true"]');
+      if (!(row instanceof HTMLElement)) return;
+
+      const book = buildRowBookFromDataset(row);
+      if (!book?.id) return;
+      if (typeof onSelectBook !== 'function') return;
+
+      onSelectBook(book);
     });
   }
 
@@ -549,6 +584,7 @@ export function setupBooksController({
 
   function bindAll() {
     bindAddControl();
+    bindRowSelection();
     bindPaginationControls();
     bindSearchControls();
     bindFilterControls();

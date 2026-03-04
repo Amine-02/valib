@@ -263,43 +263,53 @@
       </div>
     </header>
 
-    <div class="table-shell">
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-left">
-          <thead class="bg-surface-muted">
-            <tr class="text-text-soft text-xs font-bold tracking-wide uppercase">
-              <th class="px-5 py-4">Title</th>
-              <th class="px-5 py-4">Author</th>
-              <th class="px-5 py-4">Published year</th>
-              <th class="px-5 py-4">Genre</th>
-              <th class="px-5 py-4">Status</th>
-              <th class="px-5 py-4">Actions</th>
-            </tr>
-          </thead>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+      <div class="min-w-0">
+        <div class="table-shell">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left">
+              <thead class="bg-surface-muted">
+                <tr class="text-text-soft text-xs font-bold tracking-wide uppercase">
+                  <th class="px-5 py-4">Title</th>
+                  <th class="px-5 py-4">Author</th>
+                  <th class="px-5 py-4">Published year</th>
+                  <th class="px-5 py-4">Genre</th>
+                  <th class="px-5 py-4">Status</th>
+                  <th class="px-5 py-4">Actions</th>
+                </tr>
+              </thead>
 
-          <tbody id="books-table-body" class="divide-border divide-y"></tbody>
-        </table>
-      </div>
+              <tbody id="books-table-body" class="divide-border divide-y"></tbody>
+            </table>
+          </div>
 
-      <div class="border-border flex items-center justify-between gap-3 border-t px-5 py-4">
-        <p id="books-pagination-meta" class="text-text-muted text-sm">Showing 0-0 of 0 books</p>
+          <div class="border-border flex items-center justify-between gap-3 border-t px-5 py-4">
+            <p id="books-pagination-meta" class="text-text-muted text-sm">Showing 0-0 of 0 books</p>
 
-        <div class="flex items-center gap-2">
-          <button
-            id="books-prev-page"
-            type="button"
-            class="btn-secondary px-3 py-1.5 text-xs"
-            aria-label="Previous page">
-            Previous
-          </button>
+            <div class="flex items-center gap-2">
+              <button
+                id="books-prev-page"
+                type="button"
+                class="btn-secondary px-3 py-1.5 text-xs"
+                aria-label="Previous page">
+                Previous
+              </button>
 
-          <span id="books-page-indicator" class="text-text text-sm font-semibold">Page 1 / 1</span>
+              <span id="books-page-indicator" class="text-text text-sm font-semibold">Page 1 / 1</span>
 
-          <button id="books-next-page" type="button" class="btn-secondary px-3 py-1.5 text-xs" aria-label="Next page">
-            Next
-          </button>
+              <button
+                id="books-next-page"
+                type="button"
+                class="btn-secondary px-3 py-1.5 text-xs"
+                aria-label="Next page">
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <aside id="books-detail-host" class="min-w-0 xl:sticky xl:top-6 xl:self-start"></aside>
     </div>
   </div>
 
@@ -312,7 +322,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="books-edit-modal-title"
-      class="border-border bg-surface w-full max-w-xl rounded-2xl border shadow-2xl">
+      class="border-border bg-surface flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
       <div class="border-border flex items-center justify-between border-b px-5 py-4">
         <h2 id="books-edit-modal-title" class="text-text text-lg font-semibold">Edit book</h2>
         <button
@@ -327,17 +337,13 @@
         </button>
       </div>
 
-      <form id="books-edit-form" class="px-5 py-4">
+      <form id="books-edit-form" class="flex-1 overflow-y-auto px-5 py-4" novalidate>
         <div id="books-edit-form-loader" class="hidden"></div>
 
         <div id="books-edit-form-content" class="space-y-4">
           <div class="space-y-1">
             <label for="books-edit-title" class="text-text text-sm font-medium">Title</label>
-            <input
-              id="books-edit-title"
-              name="title"
-              type="text"
-              class="w-full rounded-xl border px-3 py-2 text-sm" />
+            <input id="books-edit-title" name="title" type="text" class="w-full rounded-xl border px-3 py-2 text-sm" />
           </div>
 
           <div class="space-y-1">
@@ -358,7 +364,6 @@
               min="1500"
               max="2026"
               step="1"
-              placeholder="e.g. 2020"
               class="w-full rounded-xl border px-3 py-2 text-sm" />
           </div>
 
@@ -514,6 +519,32 @@
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div id="books-edit-borrower-fields" class="grid hidden grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="space-y-1">
+              <label for="books-edit-borrower-name" class="text-text text-sm font-medium">Borrower name</label>
+              <input
+                id="books-edit-borrower-name"
+                name="borrower_name"
+                type="text"
+                autocomplete="off"
+                class="w-full rounded-xl border px-3 py-2 text-sm"
+                placeholder="Enter borrower name" />
+            </div>
+
+            <div class="space-y-1">
+              <label for="books-edit-borrower-phone" class="text-text text-sm font-medium">Borrower phone</label>
+              <input
+                id="books-edit-borrower-phone"
+                name="borrower_phone"
+                type="tel"
+                autocomplete="off"
+                inputmode="numeric"
+                maxlength="14"
+                class="w-full rounded-xl border px-3 py-2 text-sm"
+                placeholder="Enter phone number" />
             </div>
           </div>
 

@@ -138,6 +138,7 @@ export async function createBook(book) {
         summary: book.summary ?? null,
         status: book.status ?? 'available',
         borrower_name: book.borrower_name ?? null,
+        borrower_phone: book.borrower_phone ?? null,
         borrowed_at: book.borrowed_at ?? null,
         cover_url: book.cover_url ?? null,
       },
@@ -178,7 +179,7 @@ export async function deleteBook(bookId) {
   return data;
 }
 
-export async function checkOutBook(bookId, borrowerName) {
+export async function checkOutBook(bookId, borrowerName, borrowerPhone) {
   const borrowedAt = new Date().toISOString();
 
   const { data, error } = await supabaseAdmin
@@ -186,6 +187,7 @@ export async function checkOutBook(bookId, borrowerName) {
     .update({
       status: 'borrowed',
       borrower_name: borrowerName,
+      borrower_phone: borrowerPhone,
       borrowed_at: borrowedAt,
       updated_at: borrowedAt,
     })
@@ -205,6 +207,7 @@ export async function checkInBook(bookId) {
     .update({
       status: 'available',
       borrower_name: null,
+      borrower_phone: null,
       borrowed_at: null,
       updated_at: now,
     })

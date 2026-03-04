@@ -28,6 +28,9 @@ const IDS = {
   title: 'books-edit-title',
   author: 'books-edit-author',
   publishedYear: 'books-edit-published-year',
+  borrowerFields: 'books-edit-borrower-fields',
+  borrowerName: 'books-edit-borrower-name',
+  borrowerPhone: 'books-edit-borrower-phone',
   coverFile: 'books-edit-cover-file',
   coverFileName: 'books-edit-cover-file-name',
   coverPreview: 'books-edit-cover-preview',
@@ -82,6 +85,7 @@ const state = {
   bound: false,
   mode: 'edit',
   activeBookId: null,
+  activeBorrowedAt: '',
   coverUrl: '',
   uploadedCoverDataUrl: '',
   onUpdated: null,
@@ -112,6 +116,23 @@ function normalizePublishedYearInput(value, { required = false } = {}) {
   }
 
   return parsed;
+}
+
+function getPhoneDigits(value) {
+  return String(value ?? '')
+    .replace(/\D+/g, '')
+    .slice(0, 10);
+}
+
+function formatPhoneNumber(value) {
+  const digits = getPhoneDigits(value);
+  if (!digits) return '';
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }
 
 function bindOnce(element, eventName, handler) {
@@ -191,6 +212,18 @@ function setDropdownValue(name, value) {
   }
 
   syncDropdownUi(name);
+
+  if (name === 'status') {
+    syncBorrowerFields(nextValue);
+  }
+}
+
+function syncBorrowerFields(statusValue = getDropdownValue('status')) {
+  const fieldsRoot = el('borrowerFields');
+  if (!fieldsRoot) return;
+
+  const isBorrowed = String(statusValue || '') === 'borrowed';
+  fieldsRoot.classList.toggle('hidden', !isBorrowed);
 }
 
 function isDropdownMenuOpen(name) {
@@ -346,6 +379,8 @@ function fillEditForm(book) {
   const titleInput = el('title');
   const authorInput = el('author');
   const publishedYearInput = el('publishedYear');
+  const borrowerNameInput = el('borrowerName');
+  const borrowerPhoneInput = el('borrowerPhone');
 
   if (titleInput) titleInput.value = String(book?.title || '');
   if (authorInput) authorInput.value = String(book?.author || '');
@@ -354,9 +389,18 @@ function fillEditForm(book) {
       ? String(book.published_year)
       : '';
   }
+  if (borrowerNameInput) {
+    borrowerNameInput.value = String(book?.borrower_name || '');
+  }
+  if (borrowerPhoneInput) {
+    borrowerPhoneInput.value = formatPhoneNumber(
+      String(book?.borrower_phone || '')
+    );
+  }
   setDropdownValue('genre', book?.genre);
   setDropdownValue('status', book?.status);
 
+  state.activeBorrowedAt = String(book?.borrowed_at || '');
   state.coverUrl = String(book?.cover_url || '');
   state.uploadedCoverDataUrl = '';
 
@@ -368,15 +412,20 @@ function fillEditForm(book) {
 
 function fillCreateForm() {
   state.activeBookId = null;
+  state.activeBorrowedAt = '';
   state.coverUrl = '';
   state.uploadedCoverDataUrl = '';
 
   const titleInput = el('title');
   const authorInput = el('author');
   const publishedYearInput = el('publishedYear');
+  const borrowerNameInput = el('borrowerName');
+  const borrowerPhoneInput = el('borrowerPhone');
   if (titleInput) titleInput.value = '';
   if (authorInput) authorInput.value = '';
   if (publishedYearInput) publishedYearInput.value = '';
+  if (borrowerNameInput) borrowerNameInput.value = '';
+  if (borrowerPhoneInput) borrowerPhoneInput.value = formatPhoneNumber('');
 
   setDropdownValue('genre', '');
   setDropdownValue('status', 'available');
@@ -445,11 +494,24 @@ async function onCoverFileChange() {
   }
 }
 
+function onBorrowerPhoneInput() {
+  const input = el('borrowerPhone');
+  if (!input) return;
+  input.value = formatPhoneNumber(input.value);
+}
+
 function buildFormPayload() {
   const title = String(el('title')?.value || '').trim();
   const author = String(el('author')?.value || '').trim();
   const genre = getDropdownValue('genre');
   const status = getDropdownValue('status');
+  const borrowerName = String(el('borrowerName')?.value || '').trim();
+  const borrowerPhone = formatPhoneNumber(el('borrowerPhone')?.value);
+  const borrowerPhoneDigits = getPhoneDigits(borrowerPhone);
+  const borrowerPhoneInput = el('borrowerPhone');
+  if (borrowerPhoneInput && borrowerPhoneInput.value !== borrowerPhone) {
+    borrowerPhoneInput.value = borrowerPhone;
+  }
 
   if (!title) {
     throw new Error('Title is required.');
@@ -474,12 +536,31 @@ function buildFormPayload() {
     throw new Error('Status is required.');
   }
 
+  if (status === 'borrowed' && !borrowerName) {
+    throw new Error('Borrower name is required when status is borrowed.');
+  }
+
+  if (status === 'borrowed' && !borrowerPhone) {
+    throw new Error('Borrower phone is required when status is borrowed.');
+  }
+
+  if (status === 'borrowed' && borrowerPhoneDigits.length !== 10) {
+    throw new Error('Borrower phone must be 10 digits.');
+  }
+
+  const isBorrowed = status === 'borrowed';
+
   return {
     title,
     author,
     published_year: publishedYear,
     genre: genre || null,
     status: status || 'available',
+    borrower_name: isBorrowed ? borrowerName : null,
+    borrower_phone: isBorrowed ? borrowerPhone : null,
+    borrowed_at: isBorrowed
+      ? state.activeBorrowedAt || new Date().toISOString()
+      : null,
     cover_url: state.uploadedCoverDataUrl || state.coverUrl || null,
   };
 }
@@ -622,6 +703,7 @@ function bindFormHandlers() {
   bindOnce(el('coverFile'), 'change', () => {
     void onCoverFileChange();
   });
+  bindOnce(el('borrowerPhone'), 'input', onBorrowerPhoneInput);
 }
 
 function syncDefaultFormUi() {

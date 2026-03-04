@@ -1,12 +1,13 @@
 import { getBooks, getBooksCount } from '/src/services/booksService.js';
+import bookDetailTemplate from '/src/components/book-detail.html?raw';
 import { setupBooksController } from './controller.js';
 import { setupBooksModals } from './modals.js';
-import { getById } from '/src/utils/dom.js';
+import { getById, queryAll } from '/src/utils/dom.js';
 import { normalizeYearRange } from '/src/utils/filter.js';
 import { spinnerMarkup } from '/src/utils/loader.js';
 import { formatNumber } from '/src/utils/number.js';
 import { search } from '/src/utils/search.js';
-import { escapeHtml } from '/src/utils/string.js';
+import { escapeHtml, toTitleCase } from '/src/utils/string.js';
 
 const IDS = {
   tableBody: 'books-table-body',
@@ -16,6 +17,19 @@ const IDS = {
   nextPage: 'books-next-page',
   pageIndicator: 'books-page-indicator',
   booksView: 'view-books',
+  detailHost: 'books-detail-host',
+  detailEmpty: 'book-detail-empty',
+  detailPanel: 'book-detail-panel',
+  detailCover: 'book-detail-cover',
+  detailCoverFallback: 'book-detail-cover-fallback',
+  detailTitle: 'book-detail-title',
+  detailAuthor: 'book-detail-author',
+  detailStatus: 'book-detail-status',
+  detailGenre: 'book-detail-genre',
+  detailPublishedYear: 'book-detail-published-year',
+  detailBorrowerRoot: 'book-detail-borrower-root',
+  detailBorrowerName: 'book-detail-borrower-name',
+  detailBorrowerPhone: 'book-detail-borrower-phone',
 };
 
 const CONFIG = {
@@ -39,13 +53,28 @@ const state = {
   yearTo: '',
   genre: '',
   status: '',
+  selectedBookId: '',
 };
 
 let booksController = null;
 let booksModals = null;
+let detailScrollFrameId = 0;
+
+function getBooksScrollContainer() {
+  const view = el('booksView');
+  if (view instanceof HTMLElement) return view;
+  return document.scrollingElement || document.documentElement;
+}
 
 function el(key) {
   return getById(IDS[key]);
+}
+
+function ensureDetailTemplate() {
+  const host = el('detailHost');
+  if (!host || host.dataset.loaded === 'true') return;
+  host.innerHTML = bookDetailTemplate;
+  host.dataset.loaded = 'true';
 }
 
 function setMeta(text) {
@@ -143,6 +172,190 @@ function toStatusLabel(status) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function toGenreLabel(genre) {
+  const value = String(genre || '').trim();
+  if (!value) return 'N/A';
+  return toTitleCase(value.replaceAll('_', ' '));
+}
+
+function resetBookDetail() {
+  const empty = el('detailEmpty');
+  const panel = el('detailPanel');
+  const borrowerRoot = el('detailBorrowerRoot');
+  const borrowerName = el('detailBorrowerName');
+  const borrowerPhone = el('detailBorrowerPhone');
+  if (empty) empty.classList.remove('hidden');
+  if (panel) panel.classList.add('hidden');
+  if (borrowerRoot) borrowerRoot.classList.add('hidden');
+  if (borrowerName) borrowerName.textContent = 'N/A';
+  if (borrowerPhone) borrowerPhone.textContent = 'N/A';
+}
+
+function setBookDetailCover(coverUrl = '') {
+  const cover = el('detailCover');
+  const fallback = el('detailCoverFallback');
+  if (!cover || !fallback) return;
+
+  const value = String(coverUrl || '').trim();
+  if (!value) {
+    cover.removeAttribute('src');
+    cover.classList.add('hidden');
+    fallback.classList.remove('hidden');
+    return;
+  }
+
+  cover.src = value;
+  cover.classList.remove('hidden');
+  fallback.classList.add('hidden');
+}
+
+function syncBorrowerDetails({ status, borrowerName, borrowerPhone }) {
+  const root = el('detailBorrowerRoot');
+  const nameEl = el('detailBorrowerName');
+  const phoneEl = el('detailBorrowerPhone');
+  if (!root || !nameEl || !phoneEl) return;
+
+  const isBorrowed =
+    String(status || '')
+      .trim()
+      .toLowerCase() === 'borrowed';
+
+  if (!isBorrowed) {
+    root.classList.add('hidden');
+    nameEl.textContent = 'N/A';
+    phoneEl.textContent = 'N/A';
+    return;
+  }
+
+  nameEl.textContent = borrowerName || 'N/A';
+  phoneEl.textContent = borrowerPhone || 'N/A';
+  root.classList.remove('hidden');
+}
+
+function animateScrollTo(container, targetY, durationMs = 420) {
+  if (detailScrollFrameId) {
+    window.cancelAnimationFrame(detailScrollFrameId);
+    detailScrollFrameId = 0;
+  }
+
+  const isElement = container instanceof HTMLElement;
+  const startY = isElement ? container.scrollTop : window.scrollY;
+  const distance = targetY - startY;
+  if (Math.abs(distance) < 2) {
+    if (isElement) {
+      container.scrollTop = targetY;
+    } else {
+      window.scrollTo({ top: targetY, left: 0 });
+    }
+    return;
+  }
+
+  const startAt = performance.now();
+  const easeInOutCubic = (t) =>
+    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+  const tick = (now) => {
+    const progress = Math.min(1, (now - startAt) / durationMs);
+    const eased = easeInOutCubic(progress);
+    const nextY = startY + distance * eased;
+
+    if (isElement) {
+      container.scrollTop = nextY;
+    } else {
+      window.scrollTo({ top: nextY, left: 0 });
+    }
+
+    if (progress < 1) {
+      detailScrollFrameId = window.requestAnimationFrame(tick);
+      return;
+    }
+
+    detailScrollFrameId = 0;
+  };
+
+  detailScrollFrameId = window.requestAnimationFrame(tick);
+}
+
+function scrollDetailIntoViewIfStacked() {
+  if (window.matchMedia('(min-width: 1280px)').matches) return;
+  const host = el('detailHost');
+  if (!host) return;
+
+  requestAnimationFrame(() => {
+    const container = getBooksScrollContainer();
+    const hostRect = host.getBoundingClientRect();
+    const isElementContainer = container instanceof HTMLElement;
+
+    const containerTop = isElementContainer
+      ? container.getBoundingClientRect().top
+      : 0;
+    const currentY = isElementContainer ? container.scrollTop : window.scrollY;
+    const targetY = Math.max(
+      0,
+      Math.round(currentY + (hostRect.top - containerTop) - 16)
+    );
+
+    animateScrollTo(container, targetY);
+  });
+}
+
+function renderBookDetail(book) {
+  if (!book) return;
+
+  const id = String(book.id || '').trim();
+  if (!id) return;
+
+  state.selectedBookId = id;
+
+  const empty = el('detailEmpty');
+  const panel = el('detailPanel');
+  if (empty) empty.classList.add('hidden');
+  if (panel) panel.classList.remove('hidden');
+
+  const title = String(book.title || 'Untitled').trim() || 'Untitled';
+  const author =
+    String(book.author || 'Unknown author').trim() || 'Unknown author';
+  const genre = toGenreLabel(book.genre);
+  const status = String(book.status || 'available')
+    .trim()
+    .toLowerCase();
+  const publishedYear = String(book.published_year || '').trim() || 'N/A';
+  const borrowerName = String(book.borrower_name || '').trim();
+  const borrowerPhone = String(book.borrower_phone || '').trim();
+
+  const titleEl = el('detailTitle');
+  const authorEl = el('detailAuthor');
+  const genreEl = el('detailGenre');
+  const publishedYearEl = el('detailPublishedYear');
+  const statusEl = el('detailStatus');
+
+  if (titleEl) titleEl.textContent = title;
+  if (authorEl) authorEl.textContent = author;
+  if (genreEl) genreEl.textContent = genre;
+  if (publishedYearEl) publishedYearEl.textContent = publishedYear;
+
+  if (statusEl) {
+    statusEl.textContent = toStatusLabel(status);
+    statusEl.classList.remove('badge-available', 'badge-borrowed');
+    statusEl.classList.add(
+      status === 'borrowed' ? 'badge-borrowed' : 'badge-available'
+    );
+  }
+
+  syncBorrowerDetails({ status, borrowerName, borrowerPhone });
+  setBookDetailCover(book.cover_url);
+}
+
+function syncSelectedRowUi() {
+  const selectedId = String(state.selectedBookId || '');
+
+  queryAll('tr[data-book-row="true"]', el('tableBody')).forEach((row) => {
+    const isActive = selectedId !== '' && row.dataset.bookId === selectedId;
+    row.classList.toggle('bg-primary-50/70', isActive);
+    row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+}
+
 function statusBadgeMarkup(status) {
   const normalized = String(status || '')
     .trim()
@@ -172,15 +385,41 @@ function coverMarkup(book) {
 }
 
 function bookRowMarkup(book) {
-  const id = escapeHtml(book?.id ?? '-');
-  const title = escapeHtml(book?.title || 'Untitled');
-  const author = escapeHtml(book?.author || 'Unknown author');
-  const publishedYear = escapeHtml(book?.published_year || 'N/A');
-  const genre = escapeHtml(book?.genre || 'N/A');
+  const rawId = String(book?.id ?? '').trim();
+  const isSelected =
+    rawId !== '' && rawId === String(state.selectedBookId || '');
+
+  const rawTitle = String(book?.title || 'Untitled');
+  const rawAuthor = String(book?.author || 'Unknown author');
+  const rawPublishedYear = String(book?.published_year || '');
+  const rawGenre = String(book?.genre || '');
+  const rawStatus = String(book?.status || '');
+  const rawCoverUrl = String(book?.cover_url || '');
+  const rawBorrowerName = String(book?.borrower_name || '');
+  const rawBorrowerPhone = String(book?.borrower_phone || '');
+
+  const id = escapeHtml(rawId || '-');
+  const title = escapeHtml(rawTitle || 'Untitled');
+  const author = escapeHtml(rawAuthor || 'Unknown author');
+  const publishedYear = escapeHtml(rawPublishedYear || 'N/A');
+  const genre = escapeHtml(rawGenre || 'N/A');
   const status = statusBadgeMarkup(book?.status);
+  const rowClass = isSelected ? 'bg-primary-50/70' : '';
 
   return `
-    <tr class="transition hover:bg-primary-50/40">
+    <tr
+      data-book-row="true"
+      data-book-id="${escapeHtml(rawId)}"
+      data-book-title="${escapeHtml(rawTitle)}"
+      data-book-author="${escapeHtml(rawAuthor)}"
+      data-book-published-year="${escapeHtml(rawPublishedYear)}"
+      data-book-genre="${escapeHtml(rawGenre)}"
+      data-book-status="${escapeHtml(rawStatus)}"
+      data-book-cover-url="${escapeHtml(rawCoverUrl)}"
+      data-book-borrower-name="${escapeHtml(rawBorrowerName)}"
+      data-book-borrower-phone="${escapeHtml(rawBorrowerPhone)}"
+      aria-selected="${isSelected ? 'true' : 'false'}"
+      class="transition hover:bg-primary-50/40 cursor-pointer ${rowClass}">
       <td class="px-5 py-4">
         <div class="flex items-center gap-3">
           ${coverMarkup(book)}
@@ -336,6 +575,11 @@ function getBooksController() {
     filterDebounceMs: CONFIG.filterDebounceMs,
     loadBooksPage,
     openCreateModal: () => booksModals?.openCreateModal?.(),
+    onSelectBook: (book) => {
+      renderBookDetail(book);
+      syncSelectedRowUi();
+      scrollDetailIntoViewIfStacked();
+    },
   });
 
   return booksController;
@@ -385,6 +629,8 @@ async function loadBooksPage(pageNumber) {
         : 'No books found.';
       setMeta(message);
       setEmptyState(message);
+      state.selectedBookId = '';
+      resetBookDetail();
       return;
     }
 
@@ -397,13 +643,30 @@ async function loadBooksPage(pageNumber) {
     }
 
     setRows(books);
+
+    if (state.selectedBookId) {
+      const selected = books.find(
+        (book) => String(book?.id || '') === String(state.selectedBookId)
+      );
+
+      if (selected) {
+        renderBookDetail(selected);
+      } else {
+        state.selectedBookId = '';
+        resetBookDetail();
+      }
+    }
+
+    syncSelectedRowUi();
   } catch (error) {
     console.error('Failed to render books', error);
     state.total = 0;
     state.totalPages = 1;
     state.page = 1;
+    state.selectedBookId = '';
     setMeta('Failed to load books.');
     setErrorState();
+    resetBookDetail();
   } finally {
     state.loading = false;
     updatePaginationUi(rowCount);
@@ -414,6 +677,9 @@ async function loadBooksPage(pageNumber) {
 }
 
 export async function renderBooks() {
+  ensureDetailTemplate();
+  resetBookDetail();
+
   booksModals = setupBooksModals({
     onUpdated: async () => {
       await loadBooksPage(state.page);
