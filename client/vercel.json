@@ -1,0 +1,19 @@
+{
+  "buildCommand": "npm run build",
+  "headers": [
+    {
+      "source": "/app/:path*",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://valib-server-221179068766.northamerica-northeast1.run.app/api/:path*"
+    },
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/app/:path*", "destination": "/index.html" }
+  ]
+}
