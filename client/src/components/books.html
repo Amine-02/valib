@@ -24,230 +24,239 @@
           </div>
         </div>
 
-        <div class="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          <label class="sr-only" for="books-filter-year-trigger">Filter by published year</label>
-          <div id="books-filter-year-root" class="relative">
-            <button
-              id="books-filter-year-trigger"
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded="false"
-              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex h-10 w-full items-center justify-between rounded-xl border px-3 text-left text-sm transition focus:ring-2">
-              <span class="min-w-0">
-                <div class="flex flex-row gap-1">
-                  <span>Published year :</span>
-                  <span id="books-filter-year-summary">1500 - 2026</span>
+        <div class="flex w-full flex-col gap-2 xl:flex-row xl:items-center xl:justify-end">
+          <button
+            id="books-add-button"
+            type="button"
+            class="btn-primary inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold whitespace-nowrap">
+            Add book
+          </button>
+
+          <div class="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-3">
+            <label class="sr-only" for="books-filter-year-trigger">Filter by published year</label>
+            <div id="books-filter-year-root" class="relative">
+              <button
+                id="books-filter-year-trigger"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex h-10 w-full items-center justify-between rounded-xl border px-3 text-left text-sm transition focus:ring-2">
+                <span class="min-w-0">
+                  <div class="flex flex-row gap-1">
+                    <span>Published year :</span>
+                    <span id="books-filter-year-summary">1500 - 2026</span>
+                  </div>
+                </span>
+
+                <svg
+                  id="books-filter-year-chevron"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  class="text-text-soft h-4 w-4 shrink-0 transition-transform"
+                  stroke="currentColor"
+                  stroke-width="2">
+                  <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+
+              <section
+                id="books-filter-year-menu"
+                class="year-range-panel border-border bg-surface absolute z-30 mt-2 hidden w-[min(92vw,24rem)] rounded-xl border p-3 shadow-md">
+                <div class="year-range-top">
+                  <div class="year-range-field">
+                    <p class="year-range-caption">Min</p>
+                    <div id="books-filter-year-from-value" class="year-range-value">1500</div>
+                  </div>
+
+                  <span aria-hidden="true" class="year-range-separator">-</span>
+
+                  <div class="year-range-field">
+                    <p class="year-range-caption">Max</p>
+                    <div id="books-filter-year-to-value" class="year-range-value">2026</div>
+                  </div>
                 </div>
-              </span>
 
-              <svg
-                id="books-filter-year-chevron"
-                viewBox="0 0 20 20"
-                fill="none"
-                class="text-text-soft h-4 w-4 shrink-0 transition-transform"
-                stroke="currentColor"
-                stroke-width="2">
-                <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-            </button>
+                <div class="year-range-sliders">
+                  <div class="year-range-track"></div>
+                  <div id="books-filter-year-active-range" class="year-range-active"></div>
 
-            <section
-              id="books-filter-year-menu"
-              class="year-range-panel border-border bg-surface absolute z-30 mt-2 hidden w-[min(92vw,24rem)] rounded-xl border p-3 shadow-md">
-              <div class="year-range-top">
-                <div class="year-range-field">
-                  <p class="year-range-caption">Min</p>
-                  <div id="books-filter-year-from-value" class="year-range-value">1500</div>
+                  <label class="sr-only" for="books-filter-year-from">Filter by published year from</label>
+                  <input
+                    id="books-filter-year-from"
+                    type="range"
+                    min="1500"
+                    max="2026"
+                    step="1"
+                    value="1500"
+                    class="year-range-input year-range-input--from" />
+
+                  <label class="sr-only" for="books-filter-year-to">Filter by published year to</label>
+                  <input
+                    id="books-filter-year-to"
+                    type="range"
+                    min="1500"
+                    max="2026"
+                    step="1"
+                    value="2026"
+                    class="year-range-input year-range-input--to" />
                 </div>
-
-                <span aria-hidden="true" class="year-range-separator">-</span>
-
-                <div class="year-range-field">
-                  <p class="year-range-caption">Max</p>
-                  <div id="books-filter-year-to-value" class="year-range-value">2026</div>
-                </div>
-              </div>
-
-              <div class="year-range-sliders">
-                <div class="year-range-track"></div>
-                <div id="books-filter-year-active-range" class="year-range-active"></div>
-
-                <label class="sr-only" for="books-filter-year-from">Filter by published year from</label>
-                <input
-                  id="books-filter-year-from"
-                  type="range"
-                  min="1500"
-                  max="2026"
-                  step="1"
-                  value="1500"
-                  class="year-range-input year-range-input--from" />
-
-                <label class="sr-only" for="books-filter-year-to">Filter by published year to</label>
-                <input
-                  id="books-filter-year-to"
-                  type="range"
-                  min="1500"
-                  max="2026"
-                  step="1"
-                  value="2026"
-                  class="year-range-input year-range-input--to" />
-              </div>
-            </section>
-          </div>
-
-          <label class="sr-only" for="books-filter-genre-trigger">Filter by genre</label>
-          <div id="books-filter-genre-root" class="relative">
-            <input id="books-filter-genre" type="hidden" value="" />
-
-            <button
-              id="books-filter-genre-trigger"
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
-              <span id="books-filter-genre-label">All genre</span>
-              <svg
-                id="books-filter-genre-chevron"
-                viewBox="0 0 20 20"
-                fill="none"
-                class="text-text-soft h-4 w-4 transition-transform"
-                stroke="currentColor"
-                stroke-width="2">
-                <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-            </button>
-
-            <div
-              id="books-filter-genre-menu"
-              role="listbox"
-              class="border-border bg-surface absolute z-20 mt-2 hidden max-h-64 w-full overflow-y-auto rounded-xl border py-1 shadow-md">
-              <button
-                type="button"
-                role="option"
-                data-genre-option=""
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                All genre
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="fiction"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Fiction
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="fantasy"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Fantasy
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="science_fiction"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Science fiction
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="mystery"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Mystery
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="romance"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Romance
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="history"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                History
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="biography"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Biography
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="science"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Science
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="business"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Business
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-genre-option="horror"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Horror
-              </button>
+              </section>
             </div>
-          </div>
 
-          <label class="sr-only" for="books-filter-status-trigger">Filter by status</label>
-          <div id="books-filter-status-root" class="relative">
-            <input id="books-filter-status" type="hidden" value="" />
+            <label class="sr-only" for="books-filter-genre-trigger">Filter by genre</label>
+            <div id="books-filter-genre-root" class="relative">
+              <input id="books-filter-genre" type="hidden" value="" />
 
-            <button
-              id="books-filter-status-trigger"
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
-              <span id="books-filter-status-label">All status</span>
-              <svg
-                id="books-filter-status-chevron"
-                viewBox="0 0 20 20"
-                fill="none"
-                class="text-text-soft h-4 w-4 transition-transform"
-                stroke="currentColor"
-                stroke-width="2">
-                <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-            </button>
+              <button
+                id="books-filter-genre-trigger"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+                <span id="books-filter-genre-label">All genre</span>
+                <svg
+                  id="books-filter-genre-chevron"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  class="text-text-soft h-4 w-4 transition-transform"
+                  stroke="currentColor"
+                  stroke-width="2">
+                  <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
 
-            <div
-              id="books-filter-status-menu"
-              role="listbox"
-              class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+              <div
+                id="books-filter-genre-menu"
+                role="listbox"
+                class="border-border bg-surface absolute z-20 mt-2 hidden max-h-64 w-full overflow-y-auto rounded-xl border py-1 shadow-md">
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option=""
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  All genre
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="fiction"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Fiction
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="fantasy"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Fantasy
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="science_fiction"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Science fiction
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="mystery"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Mystery
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="romance"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Romance
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="history"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  History
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="biography"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Biography
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="science"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Science
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="business"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Business
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-genre-option="horror"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Horror
+                </button>
+              </div>
+            </div>
+
+            <label class="sr-only" for="books-filter-status-trigger">Filter by status</label>
+            <div id="books-filter-status-root" class="relative">
+              <input id="books-filter-status" type="hidden" value="" />
+
               <button
+                id="books-filter-status-trigger"
                 type="button"
-                role="option"
-                data-status-option=""
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                All status
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+                <span id="books-filter-status-label">All status</span>
+                <svg
+                  id="books-filter-status-chevron"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  class="text-text-soft h-4 w-4 transition-transform"
+                  stroke="currentColor"
+                  stroke-width="2">
+                  <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
               </button>
-              <button
-                type="button"
-                role="option"
-                data-status-option="available"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Available
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-status-option="borrowed"
-                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
-                Borrowed
-              </button>
+
+              <div
+                id="books-filter-status-menu"
+                role="listbox"
+                class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+                <button
+                  type="button"
+                  role="option"
+                  data-status-option=""
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  All status
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-status-option="available"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Available
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-status-option="borrowed"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Borrowed
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -261,6 +270,7 @@
             <tr class="text-text-soft text-xs font-bold tracking-wide uppercase">
               <th class="px-5 py-4">Title</th>
               <th class="px-5 py-4">Author</th>
+              <th class="px-5 py-4">Published year</th>
               <th class="px-5 py-4">Genre</th>
               <th class="px-5 py-4">Status</th>
               <th class="px-5 py-4">Actions</th>
@@ -290,6 +300,248 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div
+    id="books-edit-modal-overlay"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/25 p-4 backdrop-blur-[2px]"
+    aria-hidden="true">
+    <div
+      id="books-edit-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="books-edit-modal-title"
+      class="border-border bg-surface w-full max-w-xl rounded-2xl border shadow-2xl">
+      <div class="border-border flex items-center justify-between border-b px-5 py-4">
+        <h2 id="books-edit-modal-title" class="text-text text-lg font-semibold">Edit book</h2>
+        <button
+          id="books-edit-close"
+          type="button"
+          class="text-text-soft hover:text-text rounded-md p-1"
+          aria-label="Close edit modal">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="m6 6 12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="books-edit-form" class="px-5 py-4">
+        <div id="books-edit-form-loader" class="hidden"></div>
+
+        <div id="books-edit-form-content" class="space-y-4">
+          <div class="space-y-1">
+            <label for="books-edit-title" class="text-text text-sm font-medium">Title</label>
+            <input
+              id="books-edit-title"
+              name="title"
+              type="text"
+              class="w-full rounded-xl border px-3 py-2 text-sm" />
+          </div>
+
+          <div class="space-y-1">
+            <label for="books-edit-author" class="text-text text-sm font-medium">Author</label>
+            <input
+              id="books-edit-author"
+              name="author"
+              type="text"
+              class="w-full rounded-xl border px-3 py-2 text-sm" />
+          </div>
+
+          <div class="space-y-1">
+            <label for="books-edit-published-year" class="text-text text-sm font-medium">Published year</label>
+            <input
+              id="books-edit-published-year"
+              name="published_year"
+              type="number"
+              min="1500"
+              max="2026"
+              step="1"
+              placeholder="e.g. 2020"
+              class="w-full rounded-xl border px-3 py-2 text-sm" />
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="space-y-1">
+              <label for="books-edit-genre-trigger" class="text-text text-sm font-medium">Genre</label>
+              <div id="books-edit-genre-root" class="relative">
+                <input id="books-edit-genre" name="genre" type="hidden" value="" />
+
+                <button
+                  id="books-edit-genre-trigger"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+                  <span id="books-edit-genre-label">Select genre</span>
+                  <svg
+                    id="books-edit-genre-chevron"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    class="text-text-soft h-4 w-4 shrink-0 transition-transform"
+                    stroke="currentColor"
+                    stroke-width="2">
+                    <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+
+                <div
+                  id="books-edit-genre-menu"
+                  role="listbox"
+                  class="border-border bg-surface absolute z-20 mt-2 hidden max-h-64 w-full overflow-y-auto rounded-xl border py-1 shadow-md">
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option=""
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Select genre
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="fiction"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Fiction
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="fantasy"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Fantasy
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="science_fiction"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Science fiction
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="mystery"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Mystery
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="romance"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Romance
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="history"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    History
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="biography"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Biography
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="science"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Science
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="business"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Business
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-genre-option="horror"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Horror
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <label for="books-edit-status-trigger" class="text-text text-sm font-medium">Status</label>
+              <div id="books-edit-status-root" class="relative">
+                <input id="books-edit-status" name="status" type="hidden" value="available" />
+
+                <button
+                  id="books-edit-status-trigger"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+                  <span id="books-edit-status-label">Available</span>
+                  <svg
+                    id="books-edit-status-chevron"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    class="text-text-soft h-4 w-4 shrink-0 transition-transform"
+                    stroke="currentColor"
+                    stroke-width="2">
+                    <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+
+                <div
+                  id="books-edit-status-menu"
+                  role="listbox"
+                  class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-status-option="available"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Available
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    data-modal-status-option="borrowed"
+                    class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                    Borrowed
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label for="books-edit-cover-file" class="text-text text-sm font-medium">Cover image</label>
+
+            <div class="flex items-center gap-4">
+              <div id="books-edit-cover-fallback" class="bg-primary-100 h:35 w-auto rounded-md sm:h-60"></div>
+              <img
+                id="books-edit-cover-preview"
+                alt="Book cover preview"
+                class="hidden h-35 w-auto rounded-sm object-cover sm:h-60"
+                loading="lazy" />
+              <label for="books-edit-cover-file" class="btn-secondary px-3 py-2 text-xs">Import image</label>
+              <span id="books-edit-cover-file-name" class="text-text-soft text-xs">No file selected</span>
+            </div>
+
+            <input id="books-edit-cover-file" name="cover_file" type="file" accept="image/*" class="hidden" />
+          </div>
+
+          <p id="books-edit-feedback" class="min-h-5 text-xs font-medium text-red-600"></p>
+
+          <div class="flex justify-end gap-2 pt-1">
+            <button id="books-edit-cancel" type="button" class="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            <button id="books-edit-submit" type="submit" class="btn-primary px-4 py-2 text-sm">Save</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 </section>

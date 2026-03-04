@@ -3,183 +3,332 @@ import {
   setDropdownOpen,
   syncDropdownOptions,
 } from '/src/utils/dropdown.js';
+import { getById, queryAll } from '/src/utils/dom.js';
 import {
   normalizeIntStringInRange,
   normalizeLowerTrim,
 } from '/src/utils/filter.js';
 import { toTitleCase } from '/src/utils/string.js';
 
-const BOOKS_PREV_PAGE_ID = 'books-prev-page';
-const BOOKS_NEXT_PAGE_ID = 'books-next-page';
-const BOOKS_SEARCH_INPUT_ID = 'books-search-input';
-const BOOKS_SEARCH_CLEAR_ID = 'books-search-clear';
-const BOOKS_FILTER_YEAR_ROOT_ID = 'books-filter-year-root';
-const BOOKS_FILTER_YEAR_TRIGGER_ID = 'books-filter-year-trigger';
-const BOOKS_FILTER_YEAR_CHEVRON_ID = 'books-filter-year-chevron';
-const BOOKS_FILTER_YEAR_MENU_ID = 'books-filter-year-menu';
-const BOOKS_FILTER_YEAR_SUMMARY_ID = 'books-filter-year-summary';
-const BOOKS_FILTER_YEAR_FROM_ID = 'books-filter-year-from';
-const BOOKS_FILTER_YEAR_TO_ID = 'books-filter-year-to';
-const BOOKS_FILTER_YEAR_FROM_VALUE_ID = 'books-filter-year-from-value';
-const BOOKS_FILTER_YEAR_TO_VALUE_ID = 'books-filter-year-to-value';
-const BOOKS_FILTER_YEAR_ACTIVE_RANGE_ID = 'books-filter-year-active-range';
-const BOOKS_FILTER_GENRE_ID = 'books-filter-genre';
-const BOOKS_FILTER_GENRE_ROOT_ID = 'books-filter-genre-root';
-const BOOKS_FILTER_GENRE_TRIGGER_ID = 'books-filter-genre-trigger';
-const BOOKS_FILTER_GENRE_LABEL_ID = 'books-filter-genre-label';
-const BOOKS_FILTER_GENRE_CHEVRON_ID = 'books-filter-genre-chevron';
-const BOOKS_FILTER_GENRE_MENU_ID = 'books-filter-genre-menu';
-const BOOKS_FILTER_GENRE_OPTION_SELECTOR = '[data-genre-option]';
-const BOOKS_FILTER_STATUS_ID = 'books-filter-status';
-const BOOKS_FILTER_STATUS_ROOT_ID = 'books-filter-status-root';
-const BOOKS_FILTER_STATUS_TRIGGER_ID = 'books-filter-status-trigger';
-const BOOKS_FILTER_STATUS_LABEL_ID = 'books-filter-status-label';
-const BOOKS_FILTER_STATUS_CHEVRON_ID = 'books-filter-status-chevron';
-const BOOKS_FILTER_STATUS_MENU_ID = 'books-filter-status-menu';
-const BOOKS_FILTER_STATUS_OPTION_SELECTOR = '[data-status-option]';
+const IDS = {
+  addButton: 'books-add-button',
+  prevButton: 'books-prev-page',
+  nextButton: 'books-next-page',
+  searchInput: 'books-search-input',
+  searchClear: 'books-search-clear',
+  yearRoot: 'books-filter-year-root',
+  yearTrigger: 'books-filter-year-trigger',
+  yearChevron: 'books-filter-year-chevron',
+  yearMenu: 'books-filter-year-menu',
+  yearSummary: 'books-filter-year-summary',
+  yearFrom: 'books-filter-year-from',
+  yearTo: 'books-filter-year-to',
+  yearFromValue: 'books-filter-year-from-value',
+  yearToValue: 'books-filter-year-to-value',
+  yearActiveRange: 'books-filter-year-active-range',
+  genreInput: 'books-filter-genre',
+  genreRoot: 'books-filter-genre-root',
+  genreTrigger: 'books-filter-genre-trigger',
+  genreLabel: 'books-filter-genre-label',
+  genreChevron: 'books-filter-genre-chevron',
+  genreMenu: 'books-filter-genre-menu',
+  statusInput: 'books-filter-status',
+  statusRoot: 'books-filter-status-root',
+  statusTrigger: 'books-filter-status-trigger',
+  statusLabel: 'books-filter-status-label',
+  statusChevron: 'books-filter-status-chevron',
+  statusMenu: 'books-filter-status-menu',
+};
 
-function getById(id) {
-  return document.getElementById(id);
+const SELECTORS = {
+  genreOptions: '[data-genre-option]',
+  statusOptions: '[data-status-option]',
+};
+
+const MENU_CONFIG = {
+  year: {
+    root: 'yearRoot',
+    trigger: 'yearTrigger',
+    menu: 'yearMenu',
+    chevron: 'yearChevron',
+  },
+  genre: {
+    root: 'genreRoot',
+    trigger: 'genreTrigger',
+    menu: 'genreMenu',
+    chevron: 'genreChevron',
+  },
+  status: {
+    root: 'statusRoot',
+    trigger: 'statusTrigger',
+    menu: 'statusMenu',
+    chevron: 'statusChevron',
+  },
+};
+
+const SIMPLE_FILTER_CONFIG = {
+  genre: {
+    stateKey: 'genre',
+    input: 'genreInput',
+    label: 'genreLabel',
+    optionSelector: SELECTORS.genreOptions,
+    readOptionValue: (option) =>
+      normalizeLowerTrim(option?.dataset?.genreOption),
+    labelFor: (value) => {
+      if (!value) return 'All genre';
+      return toTitleCase(String(value).replaceAll('_', ' '));
+    },
+  },
+  status: {
+    stateKey: 'status',
+    input: 'statusInput',
+    label: 'statusLabel',
+    optionSelector: SELECTORS.statusOptions,
+    readOptionValue: (option) =>
+      normalizeLowerTrim(option?.dataset?.statusOption),
+    labelFor: (value) => {
+      if (value === 'available') return 'Available';
+      if (value === 'borrowed') return 'Borrowed';
+      return 'All status';
+    },
+  },
+};
+
+function el(key) {
+  return getById(IDS[key]);
 }
 
-function getPrevButton() {
-  return getById(BOOKS_PREV_PAGE_ID);
+function bindOnce(element, eventName, handler) {
+  if (!element || element.dataset.bound) return;
+  element.addEventListener(eventName, handler);
+  element.dataset.bound = 'true';
 }
 
-function getNextButton() {
-  return getById(BOOKS_NEXT_PAGE_ID);
+function getMenuElements(name) {
+  const config = MENU_CONFIG[name];
+  if (!config) return null;
+
+  return {
+    root: el(config.root),
+    trigger: el(config.trigger),
+    menu: el(config.menu),
+    chevron: el(config.chevron),
+  };
 }
 
-function getSearchInput() {
-  return getById(BOOKS_SEARCH_INPUT_ID);
+function isMenuOpen(name) {
+  return isDropdownOpen(getMenuElements(name)?.menu);
 }
 
-function getSearchClearButton() {
-  return getById(BOOKS_SEARCH_CLEAR_ID);
+function setMenuOpen(name, open) {
+  const elements = getMenuElements(name);
+  if (!elements) return;
+  setDropdownOpen(elements.trigger, elements.menu, elements.chevron, open);
 }
 
-function getYearFilterRoot() {
-  return getById(BOOKS_FILTER_YEAR_ROOT_ID);
+function closeMenu(name) {
+  setMenuOpen(name, false);
 }
 
-function getYearFilterTrigger() {
-  return getById(BOOKS_FILTER_YEAR_TRIGGER_ID);
+function openMenu(name, { closeOthers = true } = {}) {
+  if (closeOthers) {
+    Object.keys(MENU_CONFIG).forEach((key) => {
+      if (key === name) return;
+      closeMenu(key);
+    });
+  }
+
+  setMenuOpen(name, true);
 }
 
-function getYearFilterChevron() {
-  return getById(BOOKS_FILTER_YEAR_CHEVRON_ID);
+function toggleMenu(name) {
+  if (isMenuOpen(name)) {
+    closeMenu(name);
+    return;
+  }
+
+  openMenu(name);
 }
 
-function getYearFilterMenu() {
-  return getById(BOOKS_FILTER_YEAR_MENU_ID);
+function closeAllMenus() {
+  Object.keys(MENU_CONFIG).forEach((key) => closeMenu(key));
 }
 
-function getYearSummaryLabel() {
-  return getById(BOOKS_FILTER_YEAR_SUMMARY_ID);
+function isInsideAnyMenuRoot(target) {
+  return Object.keys(MENU_CONFIG).some((key) =>
+    getMenuElements(key)?.root?.contains(target)
+  );
 }
 
-function getYearFromFilterInput() {
-  return getById(BOOKS_FILTER_YEAR_FROM_ID);
+function getSimpleFilterConfig(name) {
+  return SIMPLE_FILTER_CONFIG[name] || null;
 }
 
-function getYearToFilterInput() {
-  return getById(BOOKS_FILTER_YEAR_TO_ID);
-}
+function getFilterOptions(name) {
+  const config = getSimpleFilterConfig(name);
+  if (!config) return [];
 
-function getYearFromValueLabel() {
-  return getById(BOOKS_FILTER_YEAR_FROM_VALUE_ID);
-}
-
-function getYearToValueLabel() {
-  return getById(BOOKS_FILTER_YEAR_TO_VALUE_ID);
-}
-
-function getYearActiveRange() {
-  return getById(BOOKS_FILTER_YEAR_ACTIVE_RANGE_ID);
-}
-
-function getGenreFilterInput() {
-  return getById(BOOKS_FILTER_GENRE_ID);
-}
-
-function getGenreFilterRoot() {
-  return getById(BOOKS_FILTER_GENRE_ROOT_ID);
-}
-
-function getGenreFilterTrigger() {
-  return getById(BOOKS_FILTER_GENRE_TRIGGER_ID);
-}
-
-function getGenreFilterLabel() {
-  return getById(BOOKS_FILTER_GENRE_LABEL_ID);
-}
-
-function getGenreFilterChevron() {
-  return getById(BOOKS_FILTER_GENRE_CHEVRON_ID);
-}
-
-function getGenreFilterMenu() {
-  return getById(BOOKS_FILTER_GENRE_MENU_ID);
-}
-
-function getGenreFilterOptions() {
-  const root = getGenreFilterRoot();
+  const root = getMenuElements(name)?.root;
   if (!root) return [];
-  return [...root.querySelectorAll(BOOKS_FILTER_GENRE_OPTION_SELECTOR)];
+
+  return queryAll(config.optionSelector, root);
 }
 
-function getStatusFilterInput() {
-  return getById(BOOKS_FILTER_STATUS_ID);
+function getFilterInputValue(name) {
+  const config = getSimpleFilterConfig(name);
+  if (!config) return '';
+  return normalizeLowerTrim(el(config.input)?.value);
 }
 
-function getStatusFilterRoot() {
-  return getById(BOOKS_FILTER_STATUS_ROOT_ID);
+function setFilterInputValue(name, value) {
+  const config = getSimpleFilterConfig(name);
+  if (!config) return;
+
+  const input = el(config.input);
+  if (input) {
+    input.value = normalizeLowerTrim(value);
+  }
 }
 
-function getStatusFilterTrigger() {
-  return getById(BOOKS_FILTER_STATUS_TRIGGER_ID);
+function syncSimpleFilterUi(name, state) {
+  const config = getSimpleFilterConfig(name);
+  if (!config) return;
+
+  const activeValue = String(state[config.stateKey] || '');
+
+  const label = el(config.label);
+  if (label) {
+    label.textContent = config.labelFor(activeValue);
+  }
+
+  syncDropdownOptions(
+    getFilterOptions(name),
+    activeValue,
+    config.readOptionValue
+  );
 }
 
-function getStatusFilterLabel() {
-  return getById(BOOKS_FILTER_STATUS_LABEL_ID);
+function syncYearRangeUi(state, { yearMin, yearMax }) {
+  const summary = el('yearSummary');
+  if (summary) {
+    summary.textContent = `${state.yearFrom || yearMin} - ${state.yearTo || yearMax}`;
+  }
+
+  const fromLabel = el('yearFromValue');
+  if (fromLabel) {
+    fromLabel.textContent = state.yearFrom || String(yearMin);
+  }
+
+  const toLabel = el('yearToValue');
+  if (toLabel) {
+    toLabel.textContent = state.yearTo || String(yearMax);
+  }
+
+  const activeRange = el('yearActiveRange');
+  if (!activeRange) return;
+
+  const span = yearMax - yearMin || 1;
+  const from = Number(state.yearFrom || yearMin);
+  const to = Number(state.yearTo || yearMax);
+  const start = Math.min(from, to);
+  const end = Math.max(from, to);
+
+  const left = ((start - yearMin) / span) * 100;
+  const width = ((end - start) / span) * 100;
+
+  activeRange.style.left = `${left}%`;
+  activeRange.style.width = `${width}%`;
 }
 
-function getStatusFilterChevron() {
-  return getById(BOOKS_FILTER_STATUS_CHEVRON_ID);
+function setFilterValues(state, values, { yearMin, yearMax }) {
+  const {
+    yearFrom = state.yearFrom,
+    yearTo = state.yearTo,
+    genre = state.genre,
+    status = state.status,
+  } = values || {};
+
+  const nextYearFrom = normalizeIntStringInRange(yearFrom, {
+    min: yearMin,
+    max: yearMax,
+    fallback: String(yearMin),
+  });
+  const nextYearTo = normalizeIntStringInRange(yearTo, {
+    min: yearMin,
+    max: yearMax,
+    fallback: String(yearMax),
+  });
+  const nextGenre = normalizeLowerTrim(genre);
+  const nextStatus = normalizeLowerTrim(status);
+
+  const changed =
+    nextYearFrom !== state.yearFrom ||
+    nextYearTo !== state.yearTo ||
+    nextGenre !== state.genre ||
+    nextStatus !== state.status;
+
+  state.yearFrom = nextYearFrom;
+  state.yearTo = nextYearTo;
+  state.genre = nextGenre;
+  state.status = nextStatus;
+
+  const yearFromInput = el('yearFrom');
+  if (yearFromInput && yearFromInput.value !== nextYearFrom) {
+    yearFromInput.value = nextYearFrom;
+  }
+
+  const yearToInput = el('yearTo');
+  if (yearToInput && yearToInput.value !== nextYearTo) {
+    yearToInput.value = nextYearTo;
+  }
+
+  setFilterInputValue('genre', nextGenre);
+  setFilterInputValue('status', nextStatus);
+  syncSimpleFilterUi('genre', state);
+  syncSimpleFilterUi('status', state);
+  syncYearRangeUi(state, { yearMin, yearMax });
+
+  return changed;
 }
 
-function getStatusFilterMenu() {
-  return getById(BOOKS_FILTER_STATUS_MENU_ID);
-}
+function getClampedYearRange({ yearMin, yearMax }, source = '') {
+  const fromInput = el('yearFrom');
+  const toInput = el('yearTo');
 
-function getStatusFilterOptions() {
-  const root = getStatusFilterRoot();
-  if (!root) return [];
-  return [...root.querySelectorAll(BOOKS_FILTER_STATUS_OPTION_SELECTOR)];
-}
+  let from = normalizeIntStringInRange(fromInput?.value, {
+    min: yearMin,
+    max: yearMax,
+    fallback: String(yearMin),
+  });
+  let to = normalizeIntStringInRange(toInput?.value, {
+    min: yearMin,
+    max: yearMax,
+    fallback: String(yearMax),
+  });
 
-function getGenreOptionValue(option) {
-  return normalizeLowerTrim(option?.dataset?.genreOption);
-}
+  if (source === 'from' && Number(from) > Number(to)) {
+    from = to;
+  }
 
-function getStatusOptionValue(option) {
-  return normalizeLowerTrim(option?.dataset?.statusOption);
-}
+  if (source === 'to' && Number(to) < Number(from)) {
+    to = from;
+  }
 
-function getGenreFilterLabelText(genreValue) {
-  if (!genreValue) return 'All genre';
-  return toTitleCase(String(genreValue).replaceAll('_', ' '));
-}
+  if (fromInput && fromInput.value !== from) {
+    fromInput.value = from;
+  }
 
-function getStatusFilterLabelText(statusValue) {
-  if (statusValue === 'available') return 'Available';
-  if (statusValue === 'borrowed') return 'Borrowed';
-  return 'All status';
+  if (toInput && toInput.value !== to) {
+    toInput.value = to;
+  }
+
+  return { from, to };
 }
 
 export function setupBooksController({
   state,
   loadBooksPage,
+  openCreateModal,
   yearMin,
   yearMax,
   searchDebounceMs,
@@ -202,7 +351,7 @@ export function setupBooksController({
   }
 
   function syncSearchUi() {
-    const clearButton = getSearchClearButton();
+    const clearButton = el('searchClear');
     if (!clearButton) return;
 
     const hasQuery = String(state.searchQuery || '').length > 0;
@@ -215,7 +364,7 @@ export function setupBooksController({
     state.searchQuery = nextQuery;
 
     if (syncInput) {
-      const input = getSearchInput();
+      const input = el('searchInput');
       if (input && input.value !== nextQuery) {
         input.value = nextQuery;
       }
@@ -225,265 +374,18 @@ export function setupBooksController({
     return changed;
   }
 
-  function syncGenreDropdownUi() {
-    const label = getGenreFilterLabel();
-    if (label) {
-      label.textContent = getGenreFilterLabelText(state.genre);
-    }
-
-    syncDropdownOptions(
-      getGenreFilterOptions(),
-      state.genre,
-      getGenreOptionValue
-    );
-  }
-
-  function syncStatusDropdownUi() {
-    const label = getStatusFilterLabel();
-    if (label) {
-      label.textContent = getStatusFilterLabelText(state.status);
-    }
-
-    syncDropdownOptions(
-      getStatusFilterOptions(),
-      state.status,
-      getStatusOptionValue
-    );
-  }
-
-  function syncYearRangeUi() {
-    const summary = getYearSummaryLabel();
-    if (summary) {
-      summary.textContent = `${state.yearFrom || yearMin} - ${state.yearTo || yearMax}`;
-    }
-
-    const fromLabel = getYearFromValueLabel();
-    if (fromLabel) {
-      fromLabel.textContent = state.yearFrom || String(yearMin);
-    }
-
-    const toLabel = getYearToValueLabel();
-    if (toLabel) {
-      toLabel.textContent = state.yearTo || String(yearMax);
-    }
-
-    const activeRange = getYearActiveRange();
-    if (!activeRange) return;
-
-    const span = yearMax - yearMin || 1;
-    const from = Number(state.yearFrom || yearMin);
-    const to = Number(state.yearTo || yearMax);
-    const start = Math.min(from, to);
-    const end = Math.max(from, to);
-
-    const left = ((start - yearMin) / span) * 100;
-    const width = ((end - start) / span) * 100;
-
-    activeRange.style.left = `${left}%`;
-    activeRange.style.width = `${width}%`;
-  }
-
-  function setFilterValues({
-    yearFrom = state.yearFrom,
-    yearTo = state.yearTo,
-    genre = state.genre,
-    status = state.status,
-  } = {}) {
-    const nextYearFrom = normalizeIntStringInRange(yearFrom, {
-      min: yearMin,
-      max: yearMax,
-      fallback: String(yearMin),
-    });
-    const nextYearTo = normalizeIntStringInRange(yearTo, {
-      min: yearMin,
-      max: yearMax,
-      fallback: String(yearMax),
-    });
-    const nextGenre = normalizeLowerTrim(genre);
-    const nextStatus = normalizeLowerTrim(status);
-
-    const changed =
-      nextYearFrom !== state.yearFrom ||
-      nextYearTo !== state.yearTo ||
-      nextGenre !== state.genre ||
-      nextStatus !== state.status;
-
-    state.yearFrom = nextYearFrom;
-    state.yearTo = nextYearTo;
-    state.genre = nextGenre;
-    state.status = nextStatus;
-
-    const yearFromInput = getYearFromFilterInput();
-    if (yearFromInput && yearFromInput.value !== nextYearFrom) {
-      yearFromInput.value = nextYearFrom;
-    }
-
-    const yearToInput = getYearToFilterInput();
-    if (yearToInput && yearToInput.value !== nextYearTo) {
-      yearToInput.value = nextYearTo;
-    }
-
-    const genreInput = getGenreFilterInput();
-    if (genreInput && genreInput.value !== nextGenre) {
-      genreInput.value = nextGenre;
-    }
-
-    const statusInput = getStatusFilterInput();
-    if (statusInput && statusInput.value !== nextStatus) {
-      statusInput.value = nextStatus;
-    }
-
-    syncGenreDropdownUi();
-    syncStatusDropdownUi();
-    syncYearRangeUi();
-
-    return changed;
-  }
-
-  function isYearMenuOpen() {
-    return isDropdownOpen(getYearFilterMenu());
-  }
-
-  function isGenreMenuOpen() {
-    return isDropdownOpen(getGenreFilterMenu());
-  }
-
-  function isStatusMenuOpen() {
-    return isDropdownOpen(getStatusFilterMenu());
-  }
-
-  function closeYearMenu() {
-    setDropdownOpen(
-      getYearFilterTrigger(),
-      getYearFilterMenu(),
-      getYearFilterChevron(),
-      false
-    );
-  }
-
-  function closeGenreMenu() {
-    setDropdownOpen(
-      getGenreFilterTrigger(),
-      getGenreFilterMenu(),
-      getGenreFilterChevron(),
-      false
-    );
-  }
-
-  function closeStatusMenu() {
-    setDropdownOpen(
-      getStatusFilterTrigger(),
-      getStatusFilterMenu(),
-      getStatusFilterChevron(),
-      false
-    );
-  }
-
-  function closeAllFilterMenus() {
-    closeYearMenu();
-    closeGenreMenu();
-    closeStatusMenu();
-  }
-
-  function openYearMenu() {
-    closeGenreMenu();
-    closeStatusMenu();
-    setDropdownOpen(
-      getYearFilterTrigger(),
-      getYearFilterMenu(),
-      getYearFilterChevron(),
-      true
-    );
-  }
-
-  function openGenreMenu() {
-    closeYearMenu();
-    closeStatusMenu();
-    setDropdownOpen(
-      getGenreFilterTrigger(),
-      getGenreFilterMenu(),
-      getGenreFilterChevron(),
-      true
-    );
-  }
-
-  function openStatusMenu() {
-    closeYearMenu();
-    closeGenreMenu();
-    setDropdownOpen(
-      getStatusFilterTrigger(),
-      getStatusFilterMenu(),
-      getStatusFilterChevron(),
-      true
-    );
-  }
-
-  function toggleYearMenu() {
-    if (isYearMenuOpen()) {
-      closeYearMenu();
-      return;
-    }
-    openYearMenu();
-  }
-
-  function toggleGenreMenu() {
-    if (isGenreMenuOpen()) {
-      closeGenreMenu();
-      return;
-    }
-    openGenreMenu();
-  }
-
-  function toggleStatusMenu() {
-    if (isStatusMenuOpen()) {
-      closeStatusMenu();
-      return;
-    }
-    openStatusMenu();
-  }
-
-  function getClampedYearRange(source = '') {
-    const fromInput = getYearFromFilterInput();
-    const toInput = getYearToFilterInput();
-
-    let from = normalizeIntStringInRange(fromInput?.value, {
-      min: yearMin,
-      max: yearMax,
-      fallback: String(yearMin),
-    });
-    let to = normalizeIntStringInRange(toInput?.value, {
-      min: yearMin,
-      max: yearMax,
-      fallback: String(yearMax),
-    });
-
-    if (source === 'from' && Number(from) > Number(to)) {
-      from = to;
-    }
-
-    if (source === 'to' && Number(to) < Number(from)) {
-      to = from;
-    }
-
-    if (fromInput && fromInput.value !== from) {
-      fromInput.value = from;
-    }
-
-    if (toInput && toInput.value !== to) {
-      toInput.value = to;
-    }
-
-    return { from, to };
-  }
-
   function reloadFromFilterInputs({ force = false } = {}) {
-    const { from, to } = getClampedYearRange();
-    const changed = setFilterValues({
-      yearFrom: from,
-      yearTo: to,
-      genre: getGenreFilterInput()?.value,
-      status: getStatusFilterInput()?.value,
-    });
+    const { from, to } = getClampedYearRange({ yearMin, yearMax });
+    const changed = setFilterValues(
+      state,
+      {
+        yearFrom: from,
+        yearTo: to,
+        genre: getFilterInputValue('genre'),
+        status: getFilterInputValue('status'),
+      },
+      { yearMin, yearMax }
+    );
 
     if (!changed && !force) return;
     void loadBooksPage(1);
@@ -497,148 +399,107 @@ export function setupBooksController({
   }
 
   function handleYearSliderInput(source) {
-    const { from, to } = getClampedYearRange(source);
-    const changed = setFilterValues({
-      yearFrom: from,
-      yearTo: to,
-    });
+    const { from, to } = getClampedYearRange({ yearMin, yearMax }, source);
+    const changed = setFilterValues(
+      state,
+      {
+        yearFrom: from,
+        yearTo: to,
+      },
+      { yearMin, yearMax }
+    );
 
     if (!changed) return;
     scheduleFilterReload({ force: true });
   }
 
   function bindPaginationControls() {
-    const prevButton = getPrevButton();
-    const nextButton = getNextButton();
+    bindOnce(el('prevButton'), 'click', () => {
+      if (state.loading || state.page <= 1) return;
+      void loadBooksPage(state.page - 1);
+    });
 
-    if (prevButton && !prevButton.dataset.bound) {
-      prevButton.addEventListener('click', () => {
-        if (state.loading || state.page <= 1) return;
-        void loadBooksPage(state.page - 1);
-      });
-      prevButton.dataset.bound = 'true';
-    }
+    bindOnce(el('nextButton'), 'click', () => {
+      if (state.loading || state.page >= state.totalPages) return;
+      void loadBooksPage(state.page + 1);
+    });
+  }
 
-    if (nextButton && !nextButton.dataset.bound) {
-      nextButton.addEventListener('click', () => {
-        if (state.loading || state.page >= state.totalPages) return;
-        void loadBooksPage(state.page + 1);
-      });
-      nextButton.dataset.bound = 'true';
-    }
+  function bindAddControl() {
+    bindOnce(el('addButton'), 'click', () => {
+      if (typeof openCreateModal !== 'function') return;
+      openCreateModal();
+    });
   }
 
   function bindSearchControls() {
-    const input = getSearchInput();
-    const clearButton = getSearchClearButton();
+    const input = el('searchInput');
+    const clearButton = el('searchClear');
 
-    if (input && !input.dataset.bound) {
-      input.addEventListener('input', () => {
-        clearSearchDebounce();
+    bindOnce(input, 'input', () => {
+      clearSearchDebounce();
 
-        searchDebounceId = window.setTimeout(() => {
-          const changed = setSearchQuery(input.value);
-          if (!changed) return;
-          void loadBooksPage(1);
-        }, searchDebounceMs);
-      });
-
-      input.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-
-        clearSearchDebounce();
-
+      searchDebounceId = window.setTimeout(() => {
         const changed = setSearchQuery(input.value);
         if (!changed) return;
         void loadBooksPage(1);
-      });
+      }, searchDebounceMs);
+    });
 
-      input.dataset.bound = 'true';
-    }
+    bindOnce(input, 'keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
 
-    if (clearButton && !clearButton.dataset.bound) {
-      clearButton.addEventListener('click', () => {
-        clearSearchDebounce();
+      clearSearchDebounce();
 
-        const changed = setSearchQuery('', { syncInput: true });
-        if (!changed) return;
+      const changed = setSearchQuery(input.value);
+      if (!changed) return;
+      void loadBooksPage(1);
+    });
 
-        if (input) input.focus();
-        void loadBooksPage(1);
-      });
+    bindOnce(clearButton, 'click', () => {
+      clearSearchDebounce();
 
-      clearButton.dataset.bound = 'true';
-    }
+      const changed = setSearchQuery('', { syncInput: true });
+      if (!changed) return;
+
+      input?.focus();
+      void loadBooksPage(1);
+    });
 
     syncSearchUi();
   }
 
   function bindYearDropdown() {
-    const trigger = getYearFilterTrigger();
-    if (trigger && !trigger.dataset.bound) {
-      trigger.addEventListener('click', () => {
-        toggleYearMenu();
-      });
-      trigger.dataset.bound = 'true';
-    }
-  }
-
-  function bindGenreDropdown() {
-    const trigger = getGenreFilterTrigger();
-    if (trigger && !trigger.dataset.bound) {
-      trigger.addEventListener('click', () => {
-        toggleGenreMenu();
-      });
-      trigger.dataset.bound = 'true';
-    }
-
-    getGenreFilterOptions().forEach((option) => {
-      if (!(option instanceof HTMLElement)) return;
-      if (option.dataset.bound) return;
-
-      option.addEventListener('click', () => {
-        closeGenreMenu();
-
-        const changed = setFilterValues({
-          genre: getGenreOptionValue(option),
-        });
-        if (!changed) return;
-
-        clearFilterDebounce();
-        void loadBooksPage(1);
-      });
-
-      option.dataset.bound = 'true';
+    bindOnce(el('yearTrigger'), 'click', () => {
+      toggleMenu('year');
     });
   }
 
-  function bindStatusDropdown() {
-    const trigger = getStatusFilterTrigger();
-    if (trigger && !trigger.dataset.bound) {
-      trigger.addEventListener('click', () => {
-        toggleStatusMenu();
-      });
-      trigger.dataset.bound = 'true';
-    }
+  function bindSimpleFilterDropdown(name) {
+    bindOnce(getMenuElements(name)?.trigger, 'click', () => {
+      toggleMenu(name);
+    });
 
-    getStatusFilterOptions().forEach((option) => {
-      if (!(option instanceof HTMLElement)) return;
-      if (option.dataset.bound) return;
+    const config = getSimpleFilterConfig(name);
+    if (!config) return;
 
-      option.addEventListener('click', () => {
-        closeStatusMenu();
+    getFilterOptions(name).forEach((option) => {
+      bindOnce(option, 'click', () => {
+        closeMenu(name);
 
-        const changed = setFilterValues({
-          status: getStatusOptionValue(option),
-        });
+        const changed = setFilterValues(
+          state,
+          {
+            [config.stateKey]: config.readOptionValue(option),
+          },
+          { yearMin, yearMax }
+        );
         if (!changed) return;
 
         clearFilterDebounce();
         void loadBooksPage(1);
       });
-
-      option.dataset.bound = 'true';
     });
   }
 
@@ -647,59 +508,47 @@ export function setupBooksController({
 
     document.addEventListener('click', (event) => {
       if (!(event.target instanceof Element)) return;
+      if (isInsideAnyMenuRoot(event.target)) return;
 
-      const yearRoot = getYearFilterRoot();
-      const genreRoot = getGenreFilterRoot();
-      const statusRoot = getStatusFilterRoot();
-      if (yearRoot?.contains(event.target)) return;
-      if (genreRoot?.contains(event.target)) return;
-      if (statusRoot?.contains(event.target)) return;
-
-      closeAllFilterMenus();
+      closeAllMenus();
     });
 
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
-      closeAllFilterMenus();
+      closeAllMenus();
     });
 
     dropdownGlobalBound = true;
   }
 
   function bindFilterControls() {
-    const yearFromInput = getYearFromFilterInput();
-    const yearToInput = getYearToFilterInput();
+    bindOnce(el('yearFrom'), 'input', () => {
+      handleYearSliderInput('from');
+    });
 
-    if (yearFromInput && !yearFromInput.dataset.bound) {
-      yearFromInput.addEventListener('input', () => {
-        handleYearSliderInput('from');
-      });
-
-      yearFromInput.dataset.bound = 'true';
-    }
-
-    if (yearToInput && !yearToInput.dataset.bound) {
-      yearToInput.addEventListener('input', () => {
-        handleYearSliderInput('to');
-      });
-
-      yearToInput.dataset.bound = 'true';
-    }
+    bindOnce(el('yearTo'), 'input', () => {
+      handleYearSliderInput('to');
+    });
 
     bindYearDropdown();
-    bindGenreDropdown();
-    bindStatusDropdown();
+    bindSimpleFilterDropdown('genre');
+    bindSimpleFilterDropdown('status');
     bindGlobalDropdownDismiss();
 
-    setFilterValues({
-      yearFrom: state.yearFrom,
-      yearTo: state.yearTo,
-      genre: state.genre,
-      status: state.status,
-    });
+    setFilterValues(
+      state,
+      {
+        yearFrom: state.yearFrom,
+        yearTo: state.yearTo,
+        genre: state.genre,
+        status: state.status,
+      },
+      { yearMin, yearMax }
+    );
   }
 
   function bindAll() {
+    bindAddControl();
     bindPaginationControls();
     bindSearchControls();
     bindFilterControls();

@@ -1,26 +1,33 @@
 import { getBooks, getBooksCount } from '/src/services/booksService.js';
 import { setupBooksController } from './controller.js';
+import { setupBooksModals } from './modals.js';
+import { getById } from '/src/utils/dom.js';
 import { normalizeYearRange } from '/src/utils/filter.js';
 import { spinnerMarkup } from '/src/utils/loader.js';
 import { formatNumber } from '/src/utils/number.js';
 import { search } from '/src/utils/search.js';
 import { escapeHtml } from '/src/utils/string.js';
 
-const BOOKS_TABLE_BODY_ID = 'books-table-body';
-const BOOKS_RESULTS_META_ID = 'books-results-meta';
-const BOOKS_PAGINATION_META_ID = 'books-pagination-meta';
-const BOOKS_PREV_PAGE_ID = 'books-prev-page';
-const BOOKS_NEXT_PAGE_ID = 'books-next-page';
-const BOOKS_PAGE_INDICATOR_ID = 'books-page-indicator';
+const IDS = {
+  tableBody: 'books-table-body',
+  resultsMeta: 'books-results-meta',
+  paginationMeta: 'books-pagination-meta',
+  prevPage: 'books-prev-page',
+  nextPage: 'books-next-page',
+  pageIndicator: 'books-page-indicator',
+  booksView: 'view-books',
+};
 
-const PAGE_SIZE = 12;
-const SORT_FIELD = 'title';
-const SORT_DIRECTION = 'asc';
-const SEARCH_DEBOUNCE_MS = 220;
-const FILTER_DEBOUNCE_MS = 220;
-const SEARCH_KEYS = ['title', 'author', 'genre', 'summary'];
-const YEAR_MIN = 1500;
-const YEAR_MAX = 2026;
+const CONFIG = {
+  pageSize: 12,
+  sortField: 'title',
+  sortDirection: 'asc',
+  searchDebounceMs: 220,
+  filterDebounceMs: 220,
+  searchKeys: ['title', 'author', 'genre', 'summary'],
+  yearMin: 1500,
+  yearMax: 2026,
+};
 
 const state = {
   page: 1,
@@ -35,71 +42,55 @@ const state = {
 };
 
 let booksController = null;
+let booksModals = null;
 
-function getTableBody() {
-  return document.getElementById(BOOKS_TABLE_BODY_ID);
+function el(key) {
+  return getById(IDS[key]);
 }
 
 function setMeta(text) {
-  const el = document.getElementById(BOOKS_RESULTS_META_ID);
-  if (el) el.textContent = text;
+  const meta = el('resultsMeta');
+  if (meta) {
+    meta.textContent = text;
+  }
 }
 
-function getPaginationMeta() {
-  return document.getElementById(BOOKS_PAGINATION_META_ID);
-}
-
-function getPrevButton() {
-  return document.getElementById(BOOKS_PREV_PAGE_ID);
-}
-
-function getNextButton() {
-  return document.getElementById(BOOKS_NEXT_PAGE_ID);
-}
-
-function getPageIndicator() {
-  return document.getElementById(BOOKS_PAGE_INDICATOR_ID);
+function setTableContent(html) {
+  const tbody = el('tableBody');
+  if (!tbody) return;
+  tbody.innerHTML = html;
 }
 
 function setLoadingState() {
-  const tbody = getTableBody();
-  if (!tbody) return;
-
-  tbody.innerHTML = `
+  setTableContent(`
     <tr>
-      <td colspan="5" class="h-40 px-5 py-4">
+      <td colspan="6" class="h-40 px-5 py-4">
         <div class="flex h-full items-center justify-center">
           ${spinnerMarkup('h-8 w-8')}
         </div>
       </td>
     </tr>
-  `;
+  `);
 }
 
 function setEmptyState(message = 'No books found.') {
-  const tbody = getTableBody();
-  if (!tbody) return;
-
-  tbody.innerHTML = `
+  setTableContent(`
     <tr>
-      <td colspan="5" class="px-5 py-8 text-center text-sm font-medium text-text-muted">
+      <td colspan="6" class="px-5 py-8 text-center text-sm font-medium text-text-muted">
         ${escapeHtml(message)}
       </td>
     </tr>
-  `;
+  `);
 }
 
 function setErrorState() {
-  const tbody = getTableBody();
-  if (!tbody) return;
-
-  tbody.innerHTML = `
+  setTableContent(`
     <tr>
-      <td colspan="5" class="px-5 py-8 text-center text-sm font-medium text-danger-text">
+      <td colspan="6" class="px-5 py-8 text-center text-sm font-medium text-danger-text">
         Failed to load books.
       </td>
     </tr>
-  `;
+  `);
 }
 
 function setButtonDisabled(button, disabled) {
@@ -114,13 +105,13 @@ function getActiveSearchQuery() {
 }
 
 function updatePaginationUi(rowCount = 0) {
-  const meta = getPaginationMeta();
-  const indicator = getPageIndicator();
-  const prevButton = getPrevButton();
-  const nextButton = getNextButton();
+  const meta = el('paginationMeta');
+  const indicator = el('pageIndicator');
+  const prevButton = el('prevPage');
+  const nextButton = el('nextPage');
 
   const hasRows = state.total > 0 && rowCount > 0;
-  const start = hasRows ? (state.page - 1) * PAGE_SIZE + 1 : 0;
+  const start = hasRows ? (state.page - 1) * CONFIG.pageSize + 1 : 0;
   const end = hasRows ? start + rowCount - 1 : 0;
 
   if (meta) {
@@ -174,16 +165,17 @@ function coverMarkup(book) {
   const coverUrl = escapeHtml(book?.cover_url || '');
 
   if (!coverUrl) {
-    return '<div class="h-14 w-10 rounded-md bg-primary-100"></div>';
+    return '<div class="h-14 w-10 rounded-sm bg-primary-100"></div>';
   }
 
-  return `<img src="${coverUrl}" alt="${title} cover" class="h-14 w-10 rounded-md object-cover" loading="lazy" onerror="this.outerHTML='<div class=&quot;h-14 w-10 rounded-md bg-primary-100&quot;></div>'" />`;
+  return `<img src="${coverUrl}" alt="${title} cover" class="h-14 w-10 rounded-sm object-cover" loading="lazy" onerror="this.outerHTML='<div class=&quot;h-14 w-10 rounded-sm bg-primary-100&quot;></div>'" />`;
 }
 
 function bookRowMarkup(book) {
   const id = escapeHtml(book?.id ?? '-');
   const title = escapeHtml(book?.title || 'Untitled');
   const author = escapeHtml(book?.author || 'Unknown author');
+  const publishedYear = escapeHtml(book?.published_year || 'N/A');
   const genre = escapeHtml(book?.genre || 'N/A');
   const status = statusBadgeMarkup(book?.status);
 
@@ -196,6 +188,7 @@ function bookRowMarkup(book) {
         </div>
       </td>
       <td class="px-5 py-4 text-sm text-text-muted">${author}</td>
+      <td class="px-5 py-4 text-sm text-text-muted">${publishedYear}</td>
       <td class="px-5 py-4 text-sm text-text-muted">${genre}</td>
       <td class="px-5 py-4">${status}</td>
       <td class="px-5 py-4">
@@ -255,21 +248,19 @@ function bookRowMarkup(book) {
 }
 
 function setRows(books) {
-  const tbody = getTableBody();
-  if (!tbody) return;
-  tbody.innerHTML = books.map(bookRowMarkup).join('');
+  setTableContent(books.map(bookRowMarkup).join(''));
 }
 
 function filterBooksBySearch(books) {
   const activeSearchQuery = getActiveSearchQuery();
   if (!activeSearchQuery) return books;
 
-  const filtered = search(activeSearchQuery, books, SEARCH_KEYS);
+  const filtered = search(activeSearchQuery, books, CONFIG.searchKeys);
   return Array.isArray(filtered) ? filtered : [];
 }
 
 function scrollBooksViewToTop() {
-  const view = document.getElementById('view-books');
+  const view = el('booksView');
   if (view instanceof HTMLElement) {
     view.scrollTo({ top: 0, left: 0 });
     return;
@@ -284,14 +275,14 @@ function buildActiveFilters() {
   const { from: queryYearFrom, to: queryYearTo } = normalizeYearRange(
     state.yearFrom,
     state.yearTo,
-    { min: YEAR_MIN, max: YEAR_MAX, sort: true }
+    { min: CONFIG.yearMin, max: CONFIG.yearMax, sort: true }
   );
 
-  if (queryYearFrom && Number(queryYearFrom) > YEAR_MIN) {
+  if (queryYearFrom && Number(queryYearFrom) > CONFIG.yearMin) {
     filters.published_year_from = queryYearFrom;
   }
 
-  if (queryYearTo && Number(queryYearTo) < YEAR_MAX) {
+  if (queryYearTo && Number(queryYearTo) < CONFIG.yearMax) {
     filters.published_year_to = queryYearTo;
   }
 
@@ -309,9 +300,9 @@ function buildActiveFilters() {
 function buildBooksQuery(page) {
   const query = {
     page,
-    limit: PAGE_SIZE,
-    sort: SORT_FIELD,
-    direction: SORT_DIRECTION,
+    limit: CONFIG.pageSize,
+    sort: CONFIG.sortField,
+    direction: CONFIG.sortDirection,
     ...buildActiveFilters(),
   };
 
@@ -339,11 +330,12 @@ function getBooksController() {
 
   booksController = setupBooksController({
     state,
-    yearMin: YEAR_MIN,
-    yearMax: YEAR_MAX,
-    searchDebounceMs: SEARCH_DEBOUNCE_MS,
-    filterDebounceMs: FILTER_DEBOUNCE_MS,
+    yearMin: CONFIG.yearMin,
+    yearMax: CONFIG.yearMax,
+    searchDebounceMs: CONFIG.searchDebounceMs,
+    filterDebounceMs: CONFIG.filterDebounceMs,
     loadBooksPage,
+    openCreateModal: () => booksModals?.openCreateModal?.(),
   });
 
   return booksController;
@@ -369,7 +361,7 @@ async function loadBooksPage(pageNumber) {
     ]);
 
     const total = Number(countResult?.count) || 0;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
 
     state.total = total;
     state.totalPages = totalPages;
@@ -422,6 +414,12 @@ async function loadBooksPage(pageNumber) {
 }
 
 export async function renderBooks() {
+  booksModals = setupBooksModals({
+    onUpdated: async () => {
+      await loadBooksPage(state.page);
+    },
+  });
+
   getBooksController().bindAll();
   await loadBooksPage(1);
 }
