@@ -25,7 +25,8 @@ const IDS = {
   paginationMeta: 'books-pagination-meta',
   prevPage: 'books-prev-page',
   nextPage: 'books-next-page',
-  pageIndicator: 'books-page-indicator',
+  pageInput: 'books-page-input',
+  pageTotal: 'books-page-total',
   booksView: 'view-books',
   detailHost: 'books-detail-host',
   detailEmpty: 'book-detail-empty',
@@ -164,9 +165,10 @@ function getActiveSearchQuery() {
 
 function updatePaginationUi(rowCount = 0) {
   const meta = el('paginationMeta');
-  const indicator = el('pageIndicator');
   const prevButton = el('prevPage');
   const nextButton = el('nextPage');
+  const pageInput = el('pageInput');
+  const pageTotal = el('pageTotal');
 
   const hasRows = state.total > 0 && rowCount > 0;
   const start = hasRows ? (state.page - 1) * CONFIG.pageSize + 1 : 0;
@@ -176,10 +178,18 @@ function updatePaginationUi(rowCount = 0) {
     meta.textContent = `Showing ${formatNumber(start)}-${formatNumber(end)} of ${formatNumber(state.total)} books`;
   }
 
-  if (indicator) {
-    const safeCurrentPage = state.total === 0 ? 0 : state.page;
-    const safeTotalPages = state.total === 0 ? 0 : state.totalPages;
-    indicator.textContent = `Page ${safeCurrentPage} / ${safeTotalPages}`;
+  const safeCurrentPage = state.total === 0 ? 0 : state.page;
+  const safeTotalPages = state.total === 0 ? 0 : state.totalPages;
+
+  if (pageInput instanceof HTMLInputElement) {
+    pageInput.value = String(safeCurrentPage);
+    pageInput.disabled = state.loading || safeTotalPages === 0;
+    pageInput.min = safeTotalPages === 0 ? '0' : '1';
+    pageInput.max = String(safeTotalPages);
+  }
+
+  if (pageTotal) {
+    pageTotal.textContent = formatNumber(safeTotalPages);
   }
 
   setButtonDisabled(

@@ -6,6 +6,10 @@ export function getTransactions(filters = {}) {
   return requestJson(`${TRANSACTIONS_API}${buildQuery(filters)}`);
 }
 
+export function getTransactionsCount(filters = {}) {
+  return requestJson(`${TRANSACTIONS_API}/count${buildQuery(filters)}`);
+}
+
 export function getTransactionById(transactionId) {
   return requestJson(`${TRANSACTIONS_API}/${transactionId}`);
 }

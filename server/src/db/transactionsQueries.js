@@ -38,6 +38,20 @@ export async function getAllBookTransactions(filters = {}) {
   return data;
 }
 
+export async function getBookTransactionsCount(filters = {}) {
+  const query = applyTransactionFilters(
+    supabaseAdmin
+      .from('transactions')
+      .select('*', { count: 'exact', head: true }),
+    filters
+  );
+
+  const { count, error } = await query;
+  if (error) throw error;
+
+  return count ?? 0;
+}
+
 export async function getBookTransactionById(transactionId) {
   const { data, error } = await supabaseAdmin
     .from('transactions')

@@ -1,4 +1,7 @@
-import { getTransactions } from '/src/services/transactionService.js';
+import {
+  getTransactions,
+  getTransactionsCount,
+} from '/src/services/transactionService.js';
 import { getBookById } from '/src/services/booksService.js';
 import {
   isDropdownOpen,
@@ -18,7 +21,8 @@ const IDS = {
   paginationMeta: 'activities-pagination-meta',
   prevPage: 'activities-prev-page',
   nextPage: 'activities-next-page',
-  pageIndicator: 'activities-page-indicator',
+  pageInput: 'activities-page-input',
+  pageTotal: 'activities-page-total',
   searchInput: 'activities-search-input',
   searchClear: 'activities-search-clear',
   actionInput: 'activities-filter-action',
@@ -37,8 +41,9 @@ const CONFIG = {
 
 const state = {
   page: 1,
+  total: 0,
+  totalPages: 1,
   loading: false,
-  hasNextPage: false,
   searchQuery: '',
   action: '',
   bookCache: new Map(),
@@ -291,24 +296,38 @@ function activityRowMarkup(activity, booksById) {
 
 function updatePaginationUi(rowCount) {
   const meta = el('paginationMeta');
-  const indicator = el('pageIndicator');
   const prevButton = el('prevPage');
   const nextButton = el('nextPage');
+  const pageInput = el('pageInput');
+  const pageTotal = el('pageTotal');
 
-  const hasRows = rowCount > 0;
+  const hasRows = state.total > 0 && rowCount > 0;
   const start = hasRows ? (state.page - 1) * CONFIG.pageSize + 1 : 0;
   const end = hasRows ? start + rowCount - 1 : 0;
 
   if (meta) {
-    meta.textContent = `Showing ${formatNumber(start)}-${formatNumber(end)}`;
+    meta.textContent = `Showing ${formatNumber(start)}-${formatNumber(end)} of ${formatNumber(state.total)} activities`;
   }
 
-  if (indicator) {
-    indicator.textContent = `Page ${state.page}`;
+  const safeCurrentPage = state.total === 0 ? 0 : state.page;
+  const safeTotalPages = state.total === 0 ? 0 : state.totalPages;
+
+  if (pageInput instanceof HTMLInputElement) {
+    pageInput.value = String(safeCurrentPage);
+    pageInput.disabled = state.loading || safeTotalPages === 0;
+    pageInput.min = safeTotalPages === 0 ? '0' : '1';
+    pageInput.max = String(safeTotalPages);
+  }
+
+  if (pageTotal) {
+    pageTotal.textContent = formatNumber(safeTotalPages);
   }
 
   setButtonDisabled(prevButton, state.loading || state.page <= 1);
-  setButtonDisabled(nextButton, state.loading || !state.hasNextPage);
+  setButtonDisabled(
+    nextButton,
+    state.loading || state.total === 0 || state.page >= state.totalPages
+  );
 }
 
 function setRows(activities, booksById) {
@@ -368,6 +387,14 @@ function buildTransactionsQuery(page, limit) {
     query.action = state.action;
   }
 
+  return query;
+}
+
+function buildTransactionsCountQuery() {
+  const query = {};
+  if (state.action) {
+    query.action = state.action;
+  }
   return query;
 }
 
@@ -446,27 +473,36 @@ async function loadActivitiesPage(pageNumber) {
       booksById = await resolveBooksById(candidates);
 
       const filtered = filterActivitiesBySearch(candidates, booksById);
-      const start = (requestedPage - 1) * CONFIG.pageSize;
-      const end = start + CONFIG.pageSize;
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
+      state.total = total;
+      state.totalPages = totalPages;
+      state.page = Math.min(requestedPage, totalPages);
 
+      const start = (state.page - 1) * CONFIG.pageSize;
+      const end = start + CONFIG.pageSize;
       rows = filtered.slice(start, end);
       rowCount = rows.length;
-      state.hasNextPage = end < filtered.length;
-      state.page = requestedPage;
     } else {
-      const data = await getTransactions(
-        buildTransactionsQuery(requestedPage, CONFIG.pageSize + 1)
+      const countResult = await getTransactionsCount(
+        buildTransactionsCountQuery()
       );
+      const total = Number(countResult?.count) || 0;
+      const totalPages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
 
-      const list = Array.isArray(data) ? data : [];
-      const sortedList = sortTransactionsByDateDesc(list);
+      state.total = total;
+      state.totalPages = totalPages;
+      state.page = Math.min(requestedPage, totalPages);
 
-      state.hasNextPage = sortedList.length > CONFIG.pageSize;
-      state.page = requestedPage;
-
-      rows = sortedList.slice(0, CONFIG.pageSize);
-      rowCount = rows.length;
-      booksById = await resolveBooksById(rows);
+      if (total > 0) {
+        const data = await getTransactions(
+          buildTransactionsQuery(state.page, CONFIG.pageSize)
+        );
+        const list = Array.isArray(data) ? data : [];
+        rows = sortTransactionsByDateDesc(list);
+        rowCount = rows.length;
+        booksById = await resolveBooksById(rows);
+      }
     }
 
     if (!rows.length) {
@@ -479,7 +515,9 @@ async function loadActivitiesPage(pageNumber) {
     }
 
     if (hasSearch) {
-      setMeta(`Showing results for "${searchQuery}" (latest first).`);
+      setMeta(
+        `Showing results for "${searchQuery}" (${formatNumber(state.total)} activities).`
+      );
     } else if (state.action) {
       setMeta(`Filtered by action: ${getActionFilterLabel(state.action)}.`);
     } else {
@@ -488,14 +526,15 @@ async function loadActivitiesPage(pageNumber) {
     setRows(rows, booksById);
   } catch (error) {
     console.error('Failed to render activities', error);
+    state.total = 0;
+    state.totalPages = 1;
     state.page = 1;
-    state.hasNextPage = false;
     setMeta('Failed to load activities.');
     setErrorState();
   } finally {
     state.loading = false;
     updatePaginationUi(rowCount);
-    if (requestedPage !== previousPage) {
+    if (state.page !== previousPage) {
       scrollToTop();
     }
   }
@@ -510,8 +549,34 @@ function bindControls() {
   });
 
   bindOnce(el('nextPage'), 'click', () => {
-    if (state.loading || !state.hasNextPage) return;
+    if (state.loading || state.page >= state.totalPages) return;
     void loadActivitiesPage(state.page + 1);
+  });
+
+  bindOnce(el('pageInput'), 'keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+
+    const input = el('pageInput');
+    if (!(input instanceof HTMLInputElement)) return;
+
+    if (state.loading || state.total <= 0) {
+      input.value = state.total <= 0 ? '0' : String(state.page);
+      return;
+    }
+
+    const parsed = Number.parseInt(String(input.value || '').trim(), 10);
+    if (!Number.isFinite(parsed)) {
+      input.value = String(state.page);
+      return;
+    }
+
+    const targetPage = Math.min(Math.max(parsed, 1), state.totalPages);
+    input.value = String(targetPage);
+    input.blur();
+
+    if (targetPage === state.page) return;
+    void loadActivitiesPage(targetPage);
   });
 
   const searchInput = el('searchInput');

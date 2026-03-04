@@ -15,6 +15,7 @@ const IDS = {
   tableBody: 'books-table-body',
   prevButton: 'books-prev-page',
   nextButton: 'books-next-page',
+  pageInput: 'books-page-input',
   searchInput: 'books-search-input',
   searchClear: 'books-search-clear',
   yearRoot: 'books-filter-year-root',
@@ -424,6 +425,32 @@ export function setupBooksController({
     bindOnce(el('nextButton'), 'click', () => {
       if (state.loading || state.page >= state.totalPages) return;
       void loadBooksPage(state.page + 1);
+    });
+
+    bindOnce(el('pageInput'), 'keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+
+      const input = el('pageInput');
+      if (!(input instanceof HTMLInputElement)) return;
+
+      if (state.loading || state.total <= 0) {
+        input.value = state.total <= 0 ? '0' : String(state.page);
+        return;
+      }
+
+      const parsed = Number.parseInt(String(input.value || '').trim(), 10);
+      if (!Number.isFinite(parsed)) {
+        input.value = String(state.page);
+        return;
+      }
+
+      const targetPage = Math.min(Math.max(parsed, 1), state.totalPages);
+      input.value = String(targetPage);
+      input.blur();
+
+      if (targetPage === state.page) return;
+      void loadBooksPage(targetPage);
     });
   }
 

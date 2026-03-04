@@ -1,6 +1,7 @@
 import {
   createBookTransaction,
   getAllBookTransactions,
+  getBookTransactionsCount,
   getBookTransactionById,
   getOverdueBooks,
 } from '../db/transactionsQueries.js';
@@ -19,6 +20,15 @@ export async function getTransactionsHandler(req, res) {
   try {
     const transactions = await getAllBookTransactions(req.query);
     res.json(transactions);
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function getTransactionsCountHandler(req, res) {
+  try {
+    const count = await getBookTransactionsCount(req.query);
+    res.json({ count });
   } catch (error) {
     handleError(res, error);
   }

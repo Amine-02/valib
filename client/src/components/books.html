@@ -58,9 +58,9 @@
               </svg>
             </button>
 
-              <section
-                id="books-filter-year-menu"
-                class="year-range-panel border-border bg-surface absolute z-30 mt-2 hidden w-[min(84vw,20rem)] rounded-xl border p-3 shadow-md sm:w-[min(92vw,24rem)]">
+            <section
+              id="books-filter-year-menu"
+              class="year-range-panel border-border bg-surface absolute z-30 mt-2 hidden w-[min(84vw,20rem)] rounded-xl border p-3 shadow-md sm:w-[min(92vw,24rem)]">
               <div class="year-range-top">
                 <div class="year-range-field">
                   <p class="year-range-caption">Min</p>
@@ -281,8 +281,8 @@
             </table>
           </div>
 
-          <div class="border-border flex items-center justify-between gap-3 border-t px-5 py-4">
-            <p id="books-pagination-meta" class="text-text-muted text-sm">Showing 0-0 of 0 books</p>
+          <div class="border-border flex items-center justify-center gap-3 border-t px-5 py-4 sm:justify-between">
+            <p id="books-pagination-meta" class="text-text-muted hidden text-sm sm:block">Showing 0-0 of 0 books</p>
 
             <div class="flex items-center gap-2">
               <button
@@ -293,7 +293,21 @@
                 Previous
               </button>
 
-              <span id="books-page-indicator" class="text-text text-sm font-semibold">Page 1 / 1</span>
+              <div class="text-text flex items-center gap-1 text-sm font-semibold">
+                <span>Page</span>
+                <label class="sr-only" for="books-page-input">Go to page number</label>
+                <input
+                  id="books-page-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="1"
+                  inputmode="numeric"
+                  class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 no-spinner h-6 w-9 rounded-lg border px-1 text-center text-sm font-semibold focus:ring-2"
+                  aria-label="Current page number" />
+                <span>/</span>
+                <span id="books-page-total">1</span>
+              </div>
 
               <button
                 id="books-next-page"

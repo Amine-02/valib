@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createTransactionHandler,
+  getTransactionsCountHandler,
   getTransactionByIdHandler,
   getTransactionsHandler,
   getOverdueBooksHandler,
@@ -9,6 +10,7 @@ import {
 const router = Router();
 
 router.get('/', getTransactionsHandler);
+router.get('/count', getTransactionsCountHandler);
 router.get('/overdue', getOverdueBooksHandler);
 router.get('/:id', getTransactionByIdHandler);
 router.post('/', createTransactionHandler);

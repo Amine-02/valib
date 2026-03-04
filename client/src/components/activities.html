@@ -2,9 +2,7 @@
   <div class="dashboard-shell mx-auto max-w-7xl space-y-6">
     <header class="space-y-1">
       <h1 class="section-title">Activities</h1>
-      <p id="activities-results-meta" class="section-subtitle">
-        Track checkout and checkin history (latest first).
-      </p>
+      <p id="activities-results-meta" class="section-subtitle">Track checkout and checkin history (latest first).</p>
 
       <div class="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="w-full max-w-md">
@@ -98,10 +96,8 @@
         </table>
       </div>
 
-      <div class="border-border flex items-center justify-between gap-3 border-t px-5 py-4">
-        <p id="activities-pagination-meta" class="text-text-muted text-sm">
-          Showing 0-0
-        </p>
+      <div class="border-border flex items-center justify-center gap-3 border-t px-5 py-4 sm:justify-between">
+        <p id="activities-pagination-meta" class="text-text-muted hidden text-sm sm:block">Showing 0-0</p>
 
         <div class="flex items-center gap-2">
           <button
@@ -112,9 +108,21 @@
             Previous
           </button>
 
-          <span id="activities-page-indicator" class="text-text text-sm font-semibold">
-            Page 1
-          </span>
+          <div class="text-text flex items-center gap-1 text-sm font-semibold">
+            <span>Page</span>
+            <label class="sr-only" for="activities-page-input">Go to page number</label>
+            <input
+              id="activities-page-input"
+              type="number"
+              min="1"
+              step="1"
+              value="1"
+              inputmode="numeric"
+              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 no-spinner h-6 w-9 rounded-lg border px-1 text-center text-sm font-semibold focus:ring-2"
+              aria-label="Current page number" />
+            <span>/</span>
+            <span id="activities-page-total">1</span>
+          </div>
 
           <button
             id="activities-next-page"
