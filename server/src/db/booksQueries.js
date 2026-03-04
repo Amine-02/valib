@@ -1,30 +1,81 @@
 import { supabaseAdmin } from './supabaseClient.js';
 
-export async function getAllBooks(filters = {}) {
-  let query = supabaseAdmin
-    .from('books')
-    .select('*')
-    .order('created_at', { ascending: false });
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 500;
+
+function toPositiveInt(value) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function applyPagination(query, filters = {}) {
+  const hasPage = filters.page !== undefined;
+  const hasLimit = filters.limit !== undefined;
+
+  if (!hasPage && !hasLimit) return query;
+
+  const page = toPositiveInt(filters.page) ?? 1;
+  const limit = Math.min(
+    toPositiveInt(filters.limit) ?? DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE
+  );
+
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  return query.range(from, to);
+}
+
+function applyBookFilters(query, filters = {}) {
+  let next = query;
 
   if (filters.status) {
-    query = query.eq('status', filters.status);
+    next = next.eq('status', filters.status);
   }
 
   if (filters.genre) {
-    query = query.ilike('genre', `%${filters.genre}%`);
+    next = next.ilike('genre', `%${filters.genre}%`);
   }
 
   if (filters.search) {
     const safe = filters.search.trim();
-    query = query.or(
+    next = next.or(
       `title.ilike.%${safe}%,author.ilike.%${safe}%,genre.ilike.%${safe}%,summary.ilike.%${safe}%`
     );
   }
+
+  return next;
+}
+
+export async function getAllBooks(filters = {}) {
+  const query = applyPagination(
+    applyBookFilters(
+      supabaseAdmin
+        .from('books')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      filters
+    ),
+    filters
+  );
 
   const { data, error } = await query;
   if (error) throw error;
 
   return data;
+}
+
+export async function getBooksCount(filters = {}) {
+  const query = applyBookFilters(
+    supabaseAdmin.from('books').select('*', { count: 'exact', head: true }),
+    filters
+  );
+
+  const { count, error } = await query;
+  if (error) throw error;
+
+  return count ?? 0;
 }
 
 export async function getBookById(bookId) {

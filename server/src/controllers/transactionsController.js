@@ -2,7 +2,10 @@ import {
   createBookTransaction,
   getAllBookTransactions,
   getBookTransactionById,
-} from '../db/transactionsRoute.js';
+  getOverdueBooks,
+} from '../db/transactionsQueries.js';
+
+const ALLOWED_ACTIONS = ['checkout', 'checkin'];
 
 function handleError(res, error) {
   if (error?.code === 'PGRST116') {
@@ -35,10 +38,24 @@ export async function createTransactionHandler(req, res) {
   if (!bookId || !action) {
     return res.status(400).json({ error: 'book_id and action are required' });
   }
+  if (!ALLOWED_ACTIONS.includes(action)) {
+    return res
+      .status(400)
+      .json({ error: 'action must be checkout or checkin' });
+  }
 
   try {
     const transaction = await createBookTransaction(req.body);
     res.status(201).json(transaction);
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function getOverdueBooksHandler(req, res) {
+  try {
+    const books = await getOverdueBooks(21);
+    res.json(books);
   } catch (error) {
     handleError(res, error);
   }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createBookHandler,
   deleteBookHandler,
+  getBooksCountHandler,
   getBookByIdHandler,
   getBooksHandler,
   checkInBookHandler,
@@ -12,6 +13,7 @@ import {
 const router = Router();
 
 router.get('/', getBooksHandler);
+router.get('/count', getBooksCountHandler);
 router.get('/:id', getBookByIdHandler);
 router.post('/', createBookHandler);
 router.patch('/:id', updateBookHandler);

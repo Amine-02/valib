@@ -4,6 +4,7 @@ import {
   createBook,
   deleteBook,
   getAllBooks,
+  getBooksCount,
   getBookById,
   updateBook,
 } from '../db/booksQueries.js';
@@ -20,6 +21,15 @@ export async function getBooksHandler(req, res) {
   try {
     const books = await getAllBooks(req.query);
     res.json(books);
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function getBooksCountHandler(req, res) {
+  try {
+    const count = await getBooksCount(req.query);
+    res.json({ count });
   } catch (error) {
     handleError(res, error);
   }
