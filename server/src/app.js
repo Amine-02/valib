@@ -1,28 +1,20 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
-// import booksRoutes from './routes/booksRoutes.js';
+import booksRoutes from './routes/booksRoute.js';
+import transactionsRoutes from './routes/transactionsRoute.js';
 
 const app = express();
 const port = process.env.PORT || 8080;
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(',');
 
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(express.json({ limit: '50mb' }));
 
 const api = express.Router();
-
-api.get('/', (req, res) => {
-  res.json({ message: 'Valib API is running' });
-});
-
-api.get('/health', (req, res) => {
-  res.json({ ok: true });
-});
-
-// api.use('/books', booksRoutes);
-
+api.use('/books', booksRoutes);
+api.use('/transactions', transactionsRoutes);
 app.use('/api', api);
-
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
 });
