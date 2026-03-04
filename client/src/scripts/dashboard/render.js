@@ -1,4 +1,8 @@
-import { getBooks, getBooksCount } from '/src/services/booksService.js';
+import {
+  getBookById,
+  getBooks,
+  getBooksCount,
+} from '/src/services/booksService.js';
 import {
   getOverdueBooks,
   getTransactions,
@@ -10,6 +14,8 @@ import { formatNumber } from '/src/utils/number.js';
 import { escapeHtml } from '/src/utils/string.js';
 
 const USERS_PLACEHOLDER_COUNT = 128;
+const RECENT_ACTIVITY_LIMIT = 10;
+const POPULAR_BOOKS_LIMIT = 10;
 const STAT_LOADER_CLASSES = [
   'w-full',
   'min-h-12',
@@ -82,6 +88,8 @@ function getActivityIconClasses(action) {
   if (action === 'checkin') {
     return {
       wrapper: 'bg-success-bg text-success-text',
+      badge: 'bg-success-bg text-success-text',
+      label: 'Checked in',
       path: 'm5 13 4 4L19 7',
     };
   }
@@ -89,37 +97,68 @@ function getActivityIconClasses(action) {
   if (action === 'checkout') {
     return {
       wrapper: 'bg-warning-bg text-warning-text',
+      badge: 'bg-warning-bg text-warning-text',
+      label: 'Checked out',
       path: 'M12 3v18m9-9H3',
     };
   }
 
   return {
     wrapper: 'bg-danger-bg text-danger-text',
+    badge: 'bg-danger-bg text-danger-text',
+    label: 'Updated',
     path: 'M12 9v4m0 4h.01',
   };
 }
 
-function buildRecentActivityItem(transaction) {
-  const action = escapeHtml(transaction?.action || 'unknown');
-  const bookId = escapeHtml(transaction?.book_id || '-');
+function formatPhone(value) {
+  const digits = String(value ?? '')
+    .replace(/\D+/g, '')
+    .slice(0, 10);
+  if (!digits) return 'N/A';
+  if (digits.length < 4) return digits;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
+function buildRecentActivityItem(transaction, book) {
   const borrowerName = escapeHtml(transaction?.borrower_name || 'N/A');
-  const notes = escapeHtml(transaction?.notes || 'No notes');
+  const borrowerPhone = escapeHtml(formatPhone(transaction?.borrower_phone));
   const createdAt = formatRelativeTime(transaction?.created_at);
+  const bookTitle = escapeHtml(book?.title || 'Unknown book');
+  const bookAuthor = escapeHtml(book?.author || '');
   const icon = getActivityIconClasses(transaction?.action);
 
   return `
-    <li class="flex items-start gap-3">
-      <span class="mt-0.5 rounded-full p-2 ${icon.wrapper}">
+    <li class="rounded-2xl border border-primary-100 bg-white/40 p-3 sm:p-4">
+      <div class="flex items-center gap-3">
+      <span class="rounded-full p-2 ${icon.wrapper}">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="${icon.path}" stroke-linecap="round" stroke-linejoin="round"></path>
         </svg>
       </span>
-      <div class="min-w-0">
-        <p class="text-sm font-semibold text-text">
-          action: ${action} | book_id: ${bookId} | borrower_name: ${borrowerName}
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-full px-2.5 py-1 text-xs font-semibold ${icon.badge}">${icon.label}</span>
+          <p class="text-xs text-text-soft">${escapeHtml(createdAt)}</p>
+        </div>
+        <p class="mt-2 text-sm font-semibold text-text">
+          ${icon.label} <span class="text-primary-700">${bookTitle}</span>
         </p>
-        <p class="text-xs text-text-soft">created_at: ${createdAt}</p>
-        <p class="text-xs text-text-muted">notes: ${notes}</p>
+        ${
+          bookAuthor
+            ? `<p class="text-xs text-text-muted">by ${bookAuthor}</p>`
+            : ''
+        }
+        <div class="mt-2 flex flex-wrap gap-2">
+          <span class="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
+            Borrower: ${borrowerName}
+          </span>
+          <span class="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-text-soft ring-1 ring-primary-100">
+            Phone: ${borrowerPhone}
+          </span>
+        </div>
+      </div>
       </div>
     </li>
   `;
@@ -136,28 +175,63 @@ function buildPopularBookItem(book, count) {
 
   return `
     <li class="flex items-center justify-between gap-3">
-      <div class="flex min-w-0 items-center gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-3">
         ${coverMarkup}
         <div class="min-w-0">
           <p class="truncate text-sm font-semibold text-text">${title}</p>
           <p class="truncate text-xs text-text-muted">${author}</p>
         </div>
       </div>
-      <span class="rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700">
+      <span class="min-w-max shrink-0 whitespace-nowrap rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700">
         ${borrowText}
       </span>
     </li>
   `;
 }
 
-function renderRecentActivity(transactions) {
+async function buildRecentActivityItems(transactions) {
+  const recent = Array.isArray(transactions)
+    ? transactions.slice(0, RECENT_ACTIVITY_LIMIT)
+    : [];
+  if (!recent.length) return [];
+
+  const uniqueBookIds = [
+    ...new Set(
+      recent
+        .map((transaction) => String(transaction?.book_id || '').trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  const entries = await Promise.all(
+    uniqueBookIds.map(async (bookId) => {
+      try {
+        const book = await getBookById(bookId);
+        return [bookId, book];
+      } catch {
+        return [bookId, null];
+      }
+    })
+  );
+
+  const booksById = new Map(entries);
+
+  return recent.map((transaction) => ({
+    transaction,
+    book: booksById.get(String(transaction?.book_id || '').trim()) || null,
+  }));
+}
+
+function renderRecentActivity(activityItems) {
   const card = findCardByTitle('Recent activity');
   const list = card?.querySelector('ul');
   if (!list) return;
 
   clearCardListLoading(list);
 
-  const items = transactions.slice(0, 5).map(buildRecentActivityItem);
+  const items = activityItems.map(({ transaction, book }) =>
+    buildRecentActivityItem(transaction, book)
+  );
   if (!items.length) {
     list.innerHTML =
       '<li class="text-sm font-medium text-text-muted">No recent activity.</li>';
@@ -167,7 +241,36 @@ function renderRecentActivity(transactions) {
   list.innerHTML = items.join('');
 }
 
-function renderPopularBooks(books, transactions) {
+async function resolveBooksByIds(bookIds, seededBooks = []) {
+  const booksById = new Map(
+    seededBooks
+      .filter((book) => book?.id !== null && book?.id !== undefined)
+      .map((book) => [String(book.id), book])
+  );
+
+  const missingIds = bookIds.filter((bookId) => !booksById.has(String(bookId)));
+  if (!missingIds.length) return booksById;
+
+  const entries = await Promise.all(
+    missingIds.map(async (bookId) => {
+      try {
+        const book = await getBookById(bookId);
+        return [String(bookId), book];
+      } catch {
+        return [String(bookId), null];
+      }
+    })
+  );
+
+  entries.forEach(([bookId, book]) => {
+    if (!book) return;
+    booksById.set(String(bookId), book);
+  });
+
+  return booksById;
+}
+
+async function renderPopularBooks(books, transactions) {
   const card = findCardByTitle('Popular books');
   const list = card?.querySelector('ul');
   if (!list) return;
@@ -184,21 +287,22 @@ function renderPopularBooks(books, transactions) {
     checkoutCounts.set(transaction.book_id, current + 1);
   });
 
-  const booksById = new Map(
-    books
-      .filter((book) => book?.id !== null && book?.id !== undefined)
-      .map((book) => [book.id, book])
-  );
+  const rankedBookIds = [...checkoutCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, POPULAR_BOOKS_LIMIT)
+    .map(([bookId]) => String(bookId));
+
+  const booksById = await resolveBooksByIds(rankedBookIds, books);
 
   const rankedBooks = [...checkoutCounts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([bookId, count]) => ({ book: booksById.get(bookId), count }))
+    .slice(0, POPULAR_BOOKS_LIMIT)
+    .map(([bookId, count]) => ({ book: booksById.get(String(bookId)), count }))
     .filter((entry) => !!entry.book);
 
   if (!rankedBooks.length) {
     const fallback = books
-      .slice(0, 4)
+      .slice(0, POPULAR_BOOKS_LIMIT)
       .map((book) => ({ book, count: 0 }))
       .filter((entry) => !!entry.book);
 
@@ -222,25 +326,29 @@ export async function renderDashboard() {
     const [
       books = [],
       booksCountResult = {},
+      checkedOutCountResult = {},
       transactions = [],
       overdueBooks = [],
     ] = await Promise.all([
       getBooks(),
       getBooksCount(),
+      getBooksCount({ status: 'borrowed' }),
       getTransactions(),
       getOverdueBooks(),
     ]);
 
-    const checkedOutBooks = books.filter((book) => book?.status === 'borrowed');
     const totalBooks = Number(booksCountResult?.count) || 0;
+    const checkedOutBooksCount = Number(checkedOutCountResult?.count) || 0;
 
     setStatValue('Total books', totalBooks);
-    setStatValue('Checked out books', checkedOutBooks.length);
+    setStatValue('Checked out books', checkedOutBooksCount);
     setStatValue('Overdue books', overdueBooks.length);
     setStatValue('Number of users', USERS_PLACEHOLDER_COUNT);
 
-    renderRecentActivity(transactions);
-    renderPopularBooks(books, transactions);
+    const recentActivityItems = await buildRecentActivityItems(transactions);
+
+    renderRecentActivity(recentActivityItems);
+    await renderPopularBooks(books, transactions);
   } catch (error) {
     console.error('Failed to render dashboard', error);
     setStatValue('Total books', 0);

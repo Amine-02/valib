@@ -1,0 +1,130 @@
+<section class="page-shell p-4 md:p-6">
+  <div class="dashboard-shell mx-auto max-w-7xl space-y-6">
+    <header class="space-y-1">
+      <h1 class="section-title">Activities</h1>
+      <p id="activities-results-meta" class="section-subtitle">
+        Track checkout and checkin history (latest first).
+      </p>
+
+      <div class="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="w-full max-w-md">
+          <label for="activities-search-input" class="sr-only">Search activities</label>
+          <div class="relative">
+            <input
+              id="activities-search-input"
+              type="text"
+              placeholder="Search book, author, borrower, or phone"
+              autocomplete="off"
+              class="border-border bg-surface text-text placeholder:text-text-soft focus:border-primary-400 focus:ring-primary-200 w-full rounded-xl border px-3 py-2 pr-14 text-sm focus:ring-2" />
+            <button
+              id="activities-search-clear"
+              type="button"
+              class="text-text-soft hover:text-text absolute top-1/2 right-2 hidden -translate-y-1/2 rounded-md px-2 py-1 text-xs font-semibold"
+              aria-label="Clear activities search">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="w-full md:w-56">
+          <label for="activities-filter-action-trigger" class="sr-only">Filter by action</label>
+          <div id="activities-filter-action-root" class="relative">
+            <input id="activities-filter-action" type="hidden" value="" />
+
+            <button
+              id="activities-filter-action-trigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+              <span id="activities-filter-action-label">All action</span>
+              <svg
+                id="activities-filter-action-chevron"
+                viewBox="0 0 20 20"
+                fill="none"
+                class="text-text-soft h-4 w-4 transition-transform"
+                stroke="currentColor"
+                stroke-width="2">
+                <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+
+            <div
+              id="activities-filter-action-menu"
+              role="listbox"
+              class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+              <button
+                type="button"
+                role="option"
+                data-action-option=""
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                All action
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-action-option="checkout"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Checkout
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-action-option="checkin"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Checkin
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="table-shell">
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left">
+          <thead class="bg-surface-muted">
+            <tr class="text-text-soft text-xs font-bold tracking-wide uppercase">
+              <th class="px-5 py-4">Activity ID</th>
+              <th class="px-5 py-4">Book</th>
+              <th class="px-5 py-4">Action</th>
+              <th class="px-5 py-4">Borrower name</th>
+              <th class="px-5 py-4">Borrower phone</th>
+              <th class="px-5 py-4 whitespace-nowrap">Date of action</th>
+            </tr>
+          </thead>
+
+          <tbody id="activities-table-body" class="divide-border divide-y"></tbody>
+        </table>
+      </div>
+
+      <div class="border-border flex items-center justify-between gap-3 border-t px-5 py-4">
+        <p id="activities-pagination-meta" class="text-text-muted text-sm">
+          Showing 0-0
+        </p>
+
+        <div class="flex items-center gap-2">
+          <button
+            id="activities-prev-page"
+            type="button"
+            class="btn-secondary px-3 py-1.5 text-xs"
+            aria-label="Previous page">
+            Previous
+          </button>
+
+          <span id="activities-page-indicator" class="text-text text-sm font-semibold">
+            Page 1
+          </span>
+
+          <button
+            id="activities-next-page"
+            type="button"
+            class="btn-secondary px-3 py-1.5 text-xs"
+            aria-label="Next page">
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

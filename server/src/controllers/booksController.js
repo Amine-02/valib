@@ -8,6 +8,43 @@ import {
   getBookById,
   updateBook,
 } from '../db/booksQueries.js';
+import { createBookTransaction } from '../db/transactionsQueries.js';
+
+const BORROWED_STATUS = 'borrowed';
+const AVAILABLE_STATUS = 'available';
+
+function normalizeStatus(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
+}
+
+async function logBookStatusTransaction(book, action, { fromBook } = {}) {
+  if (!book?.id) return;
+
+  await createBookTransaction({
+    book_id: book.id,
+    action,
+    borrower_name: fromBook?.borrower_name ?? book?.borrower_name ?? null,
+    borrower_phone: fromBook?.borrower_phone ?? book?.borrower_phone ?? null,
+  });
+}
+
+async function logStatusTransitionTransaction(previousBook, nextBook) {
+  const previousStatus = normalizeStatus(previousBook?.status);
+  const nextStatus = normalizeStatus(nextBook?.status);
+
+  if (previousStatus !== BORROWED_STATUS && nextStatus === BORROWED_STATUS) {
+    await logBookStatusTransaction(nextBook, 'checkout');
+    return;
+  }
+
+  if (previousStatus === BORROWED_STATUS && nextStatus === AVAILABLE_STATUS) {
+    await logBookStatusTransaction(nextBook, 'checkin', {
+      fromBook: previousBook,
+    });
+  }
+}
 
 function handleError(res, error) {
   if (error?.code === 'PGRST116') {
@@ -52,6 +89,9 @@ export async function createBookHandler(req, res) {
 
   try {
     const book = await createBook(req.body);
+    if (normalizeStatus(book?.status) === BORROWED_STATUS) {
+      await logBookStatusTransaction(book, 'checkout');
+    }
     res.status(201).json(book);
   } catch (error) {
     handleError(res, error);
@@ -64,7 +104,9 @@ export async function updateBookHandler(req, res) {
   }
 
   try {
+    const previousBook = await getBookById(req.params.id);
     const book = await updateBook(req.params.id, req.body);
+    await logStatusTransitionTransaction(previousBook, book);
     res.json(book);
   } catch (error) {
     handleError(res, error);
@@ -82,12 +124,15 @@ export async function deleteBookHandler(req, res) {
 
 export async function checkOutBookHandler(req, res) {
   const borrowerName = req.body?.borrower_name;
+  const borrowerPhone = req.body?.borrower_phone;
   if (!borrowerName) {
     return res.status(400).json({ error: 'borrower_name is required' });
   }
 
   try {
-    const book = await checkOutBook(req.params.id, borrowerName);
+    const previousBook = await getBookById(req.params.id);
+    const book = await checkOutBook(req.params.id, borrowerName, borrowerPhone);
+    await logStatusTransitionTransaction(previousBook, book);
     res.json(book);
   } catch (error) {
     handleError(res, error);
@@ -96,7 +141,9 @@ export async function checkOutBookHandler(req, res) {
 
 export async function checkInBookHandler(req, res) {
   try {
+    const previousBook = await getBookById(req.params.id);
     const book = await checkInBook(req.params.id);
+    await logStatusTransitionTransaction(previousBook, book);
     res.json(book);
   } catch (error) {
     handleError(res, error);

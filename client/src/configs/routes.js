@@ -1,10 +1,10 @@
 import dashboardTemplate from '/src/components/dashboard.html?raw';
 import booksTemplate from '/src/components/books.html?raw';
-import transactionsTemplate from '/src/components/transactions.html?raw';
+import activitiesTemplate from '/src/components/activities.html?raw';
 
 import { setupDashboard } from '/src/scripts/dashboard/index.js';
 import { setupBooks } from '/src/scripts/books/index.js';
-import { setupTransactions } from '/src/scripts/transactions/index.js';
+import { setupActivities } from '/src/scripts/activities/index.js';
 
 export const ROUTE_CONFIG = {
   dashboard: {
@@ -20,9 +20,9 @@ export const ROUTE_CONFIG = {
   },
 
   activties: {
-    viewId: 'view-transactions',
-    template: transactionsTemplate,
-    loader: setupTransactions,
+    viewId: 'view-activities',
+    template: activitiesTemplate,
+    loader: setupActivities,
   },
 
   404: {
