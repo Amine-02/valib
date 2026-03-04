@@ -38,7 +38,28 @@ export function setRoute(route, { replace = false } = {}) {
 }
 
 function closeSidebar() {
+  if (window.matchMedia('(min-width: 1024px)').matches) return;
   document.getElementById('sidebar')?.classList.add('hidden');
+}
+
+function applyLayout(layout = 'app') {
+  const header = document.getElementById('header');
+  const sidebar = document.getElementById('sidebar');
+  const content = document.getElementById('content');
+  const isAuthLayout = layout === 'auth';
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+
+  header?.classList.toggle('hidden', isAuthLayout);
+  if (sidebar) {
+    if (isAuthLayout) {
+      sidebar.classList.add('hidden');
+    } else if (isDesktop) {
+      sidebar.classList.remove('hidden');
+    } else {
+      sidebar.classList.add('hidden');
+    }
+  }
+  content?.classList.toggle('auth-layout', isAuthLayout);
 }
 
 function highlightActiveTabLink(currentRoute) {
@@ -78,6 +99,7 @@ async function loadSidebar() {
 
   document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
 
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (!sidebar.contains(event.target) && !toggleBtn?.contains(event.target)) {
@@ -117,6 +139,7 @@ export async function handleRouting() {
   const { route } = getRouteInfo();
   const config = ROUTE_CONFIG[route];
   if (!config) return;
+  applyLayout(config.layout || 'app');
 
   document.querySelectorAll('.page-view').forEach((view) => {
     view.classList.add('hidden');
@@ -154,6 +177,13 @@ async function bootstrapApp() {
 
 window.addEventListener('popstate', () => {
   void handleRouting();
+});
+
+window.addEventListener('resize', () => {
+  const { route } = getRouteInfo();
+  const config = ROUTE_CONFIG[route];
+  if (!config) return;
+  applyLayout(config.layout || 'app');
 });
 
 window.addEventListener('DOMContentLoaded', () => {

@@ -1,7 +1,7 @@
 import {
   getTransactions,
   getTransactionsCount,
-} from '/src/services/transactionService.js';
+} from '/src/services/transactionsService.js';
 import { getBookById } from '/src/services/booksService.js';
 import {
   isDropdownOpen,

@@ -370,3 +370,7 @@
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+#content.auth-layout {
+  padding-top: 0 !important;
+}

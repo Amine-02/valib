@@ -6,7 +6,7 @@ import {
 import {
   getOverdueBooks,
   getTransactions,
-} from '/src/services/transactionService.js';
+} from '/src/services/transactionsService.js';
 import { formatRelativeTime } from '/src/utils/date.js';
 import { findElementByChildText } from '/src/utils/dom.js';
 import { clearLoaderState, showCenteredLoader } from '/src/utils/loader.js';
