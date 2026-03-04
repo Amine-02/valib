@@ -272,7 +272,7 @@ function activityRowMarkup(activity, booksById) {
 
   return `
     <tr class="transition hover:bg-primary-50/40">
-      <td class="px-5 py-4 text-xs font-medium text-text-muted">
+      <td class="px-5 py-4 text-xs font-medium text-text-muted break-all whitespace-normal">
         <span class="font-mono">${activityId}</span>
       </td>
       <td class="px-5 py-4">
@@ -282,8 +282,8 @@ function activityRowMarkup(activity, booksById) {
       <td class="px-5 py-4">
         ${formatActionBadge(activity?.action)}
       </td>
-      <td class="px-5 py-4 text-sm text-text">${borrowerName}</td>
-      <td class="px-5 py-4 text-sm text-text-muted">${borrowerPhone}</td>
+      <td class="px-5 py-4 text-sm text-text whitespace-nowrap">${borrowerName}</td>
+      <td class="px-5 py-4 text-sm text-text-muted whitespace-nowrap">${borrowerPhone}</td>
       <td class="px-5 py-4 text-sm text-text-muted whitespace-nowrap">${dateText}</td>
     </tr>
   `;

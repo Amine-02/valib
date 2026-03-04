@@ -46,3 +46,15 @@ export function checkInBook(bookId) {
     method: 'POST',
   });
 }
+
+export function generateBookSummary(bookId) {
+  return requestJson(`${BOOKS_API}/${bookId}/ai-summary`, {
+    method: 'POST',
+  });
+}
+
+export function generateBookReview(bookId) {
+  return requestJson(`${BOOKS_API}/${bookId}/ai-review`, {
+    method: 'POST',
+  });
+}

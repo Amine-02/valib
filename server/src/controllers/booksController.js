@@ -1,4 +1,6 @@
 import {
+  callAIForReview,
+  callAIForSummary,
   checkInBook,
   checkOutBook,
   createBook,
@@ -6,6 +8,8 @@ import {
   getAllBooks,
   getBooksCount,
   getBookById,
+  updateBookReview,
+  updateBookSummary,
   updateBook,
 } from '../db/booksQueries.js';
 import { createBookTransaction } from '../db/transactionsQueries.js';
@@ -145,6 +149,46 @@ export async function checkInBookHandler(req, res) {
     const book = await checkInBook(req.params.id);
     await logStatusTransitionTransaction(previousBook, book);
     res.json(book);
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function generateBookSummaryHandler(req, res) {
+  try {
+    const book = await getBookById(req.params.id);
+    const summary = await callAIForSummary({
+      title: book?.title,
+      author: book?.author,
+      genre: book?.genre,
+      publishedYear: book?.published_year,
+    });
+
+    const updated = await updateBookSummary(req.params.id, summary);
+    res.json({
+      id: updated.id,
+      summary: updated.summary,
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function generateBookReviewHandler(req, res) {
+  try {
+    const book = await getBookById(req.params.id);
+    const review = await callAIForReview({
+      title: book?.title,
+      author: book?.author,
+      genre: book?.genre,
+      publishedYear: book?.published_year,
+    });
+
+    const updated = await updateBookReview(req.params.id, review);
+    res.json({
+      id: updated.id,
+      review: updated.review,
+    });
   } catch (error) {
     handleError(res, error);
   }

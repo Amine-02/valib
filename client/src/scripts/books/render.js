@@ -1,10 +1,20 @@
-import { getBooks, getBooksCount } from '/src/services/booksService.js';
+import {
+  generateBookReview,
+  generateBookSummary,
+  getBookById,
+  getBooks,
+  getBooksCount,
+} from '/src/services/booksService.js';
 import bookDetailTemplate from '/src/components/book-detail.html?raw';
 import { setupBooksController } from './controller.js';
 import { setupBooksModals } from './modals.js';
 import { getById, queryAll } from '/src/utils/dom.js';
 import { normalizeYearRange } from '/src/utils/filter.js';
-import { spinnerMarkup } from '/src/utils/loader.js';
+import {
+  clearLoaderState,
+  showCenteredLoader,
+  spinnerMarkup,
+} from '/src/utils/loader.js';
 import { formatNumber } from '/src/utils/number.js';
 import { search } from '/src/utils/search.js';
 import { escapeHtml, toTitleCase } from '/src/utils/string.js';
@@ -30,6 +40,11 @@ const IDS = {
   detailBorrowerRoot: 'book-detail-borrower-root',
   detailBorrowerName: 'book-detail-borrower-name',
   detailBorrowerPhone: 'book-detail-borrower-phone',
+  detailAiSummary: 'book-detail-ai-summary',
+  detailAiRatingStars: 'book-detail-ai-rating-stars',
+  detailAiRatingText: 'book-detail-ai-rating-text',
+  detailAiRating: 'book-detail-ai-rating',
+  detailAiReviews: 'book-detail-ai-reviews',
 };
 
 const CONFIG = {
@@ -54,11 +69,25 @@ const state = {
   genre: '',
   status: '',
   selectedBookId: '',
+  detailRequestId: 0,
 };
 
 let booksController = null;
 let booksModals = null;
 let detailScrollFrameId = 0;
+const AI_SUMMARY_LOADER_CLASSES = [
+  'min-h-16',
+  'flex',
+  'items-center',
+  'justify-center',
+];
+const AI_REVIEWS_LOADER_CLASSES = [
+  'min-h-24',
+  'flex',
+  'items-center',
+  'justify-center',
+];
+const AI_RATING_LOADER_CLASSES = ['min-h-6', 'inline-flex', 'items-center'];
 
 function getBooksScrollContainer() {
   const view = el('booksView');
@@ -189,6 +218,7 @@ function resetBookDetail() {
   if (borrowerRoot) borrowerRoot.classList.add('hidden');
   if (borrowerName) borrowerName.textContent = 'N/A';
   if (borrowerPhone) borrowerPhone.textContent = 'N/A';
+  resetAiDetail();
 }
 
 function setBookDetailCover(coverUrl = '') {
@@ -230,6 +260,211 @@ function syncBorrowerDetails({ status, borrowerName, borrowerPhone }) {
   nameEl.textContent = borrowerName || 'N/A';
   phoneEl.textContent = borrowerPhone || 'N/A';
   root.classList.remove('hidden');
+}
+
+function isActiveDetailRequest(bookId, requestId) {
+  return (
+    String(state.selectedBookId || '') === String(bookId || '') &&
+    requestId === state.detailRequestId
+  );
+}
+
+function normalizeReviewScore(score) {
+  const parsed = Number(score);
+  if (!Number.isFinite(parsed)) return 4;
+  return Math.max(0, Math.min(5, parsed));
+}
+
+function normalizeReviewQuotes(quotes) {
+  if (!Array.isArray(quotes)) {
+    return [
+      '"Placeholder curated review #1"',
+      '"Placeholder curated review #2"',
+    ];
+  }
+
+  const cleaned = quotes
+    .map((quote) => String(quote || '').trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((quote) => {
+      const trimmed = quote.replace(/^['"]+|['"]+$/g, '');
+      return `"${trimmed}"`;
+    });
+
+  if (cleaned.length === 2) return cleaned;
+  if (cleaned.length === 1) {
+    return [cleaned[0], '"Placeholder curated review #2"'];
+  }
+  return ['"Placeholder curated review #1"', '"Placeholder curated review #2"'];
+}
+
+function parseReviewObject(review) {
+  if (!review) return null;
+
+  let value = review;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!value || typeof value !== 'object') return null;
+
+  return {
+    score: normalizeReviewScore(value.score),
+    quotes: normalizeReviewQuotes(value.quotes),
+  };
+}
+
+function setAiSummaryLoading() {
+  const summaryEl = el('detailAiSummary');
+  if (!summaryEl) return;
+
+  showCenteredLoader(summaryEl, {
+    sizeClass: 'h-6 w-6',
+    targetClasses: AI_SUMMARY_LOADER_CLASSES,
+  });
+}
+
+function setAiReviewLoading() {
+  const reviewsEl = el('detailAiReviews');
+  const starsEl = el('detailAiRatingStars');
+  const ratingTextEl = el('detailAiRatingText');
+  if (reviewsEl) {
+    showCenteredLoader(reviewsEl, {
+      sizeClass: 'h-6 w-6',
+      targetClasses: AI_REVIEWS_LOADER_CLASSES,
+      wrapperTag: 'li',
+      wrapperClass: 'flex items-center justify-center',
+    });
+  }
+
+  if (starsEl) {
+    showCenteredLoader(starsEl, {
+      sizeClass: 'h-4 w-4',
+      targetClasses: AI_RATING_LOADER_CLASSES,
+    });
+  }
+
+  if (ratingTextEl) {
+    ratingTextEl.textContent = 'Loading...';
+  }
+}
+
+function renderAiSummary(summary) {
+  const summaryEl = el('detailAiSummary');
+  if (!summaryEl) return;
+
+  clearLoaderState(summaryEl, AI_SUMMARY_LOADER_CLASSES);
+  summaryEl.textContent =
+    String(summary || '').trim() || 'Summary unavailable right now.';
+}
+
+function renderAiRating(score) {
+  const safeScore = normalizeReviewScore(score);
+  const starsEl = el('detailAiRatingStars');
+  const ratingTextEl = el('detailAiRatingText');
+  const ratingRoot = el('detailAiRating');
+
+  if (starsEl) {
+    clearLoaderState(starsEl, AI_RATING_LOADER_CLASSES);
+
+    const fillPercent = Math.round((safeScore / 5) * 1000) / 10;
+    starsEl.innerHTML = `
+      <span class="relative inline-block leading-none tracking-[0.05em]">
+        <span class="text-slate-300">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+        <span class="absolute inset-y-0 left-0 overflow-hidden text-amber-500" style="width:${fillPercent}%;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+      </span>
+    `;
+  }
+
+  if (ratingTextEl) {
+    ratingTextEl.textContent = `${safeScore.toFixed(1)}/5`;
+  }
+
+  if (ratingRoot) {
+    ratingRoot.setAttribute(
+      'aria-label',
+      `Ai rating ${safeScore.toFixed(1)} out of 5`
+    );
+  }
+}
+
+function renderAiReviews(quotes) {
+  const reviewsEl = el('detailAiReviews');
+  if (!reviewsEl) return;
+
+  clearLoaderState(reviewsEl, AI_REVIEWS_LOADER_CLASSES);
+
+  const safeQuotes = normalizeReviewQuotes(quotes);
+  reviewsEl.innerHTML = safeQuotes
+    .map(
+      (quote) => `
+        <li class="border-border bg-surface rounded-xl border px-3.5 py-3">
+          <p class="text-text-muted text-sm leading-6">${escapeHtml(quote)}</p>
+        </li>
+      `
+    )
+    .join('');
+}
+
+function resetAiDetail() {
+  renderAiSummary('Placeholder summary generated by AI.');
+  renderAiRating(4);
+  renderAiReviews([
+    '"Placeholder curated review #1"',
+    '"Placeholder curated review #2"',
+  ]);
+}
+
+async function resolveBookSummary(book, bookId, requestId) {
+  const existingSummary = String(book?.summary || '').trim();
+  if (existingSummary) {
+    renderAiSummary(existingSummary);
+    return;
+  }
+
+  try {
+    const generated = await generateBookSummary(bookId);
+    if (!isActiveDetailRequest(bookId, requestId)) return;
+    renderAiSummary(generated?.summary);
+  } catch (error) {
+    console.error('Failed to generate AI summary', error);
+    if (!isActiveDetailRequest(bookId, requestId)) return;
+    renderAiSummary('');
+  }
+}
+
+async function resolveBookReview(book, bookId, requestId) {
+  const existingReview = parseReviewObject(book?.review);
+  if (existingReview) {
+    renderAiRating(existingReview.score);
+    renderAiReviews(existingReview.quotes);
+    return;
+  }
+
+  try {
+    const generated = await generateBookReview(bookId);
+    if (!isActiveDetailRequest(bookId, requestId)) return;
+
+    const review = parseReviewObject(generated?.review);
+    if (!review) {
+      renderAiRating(4);
+      renderAiReviews([]);
+      return;
+    }
+
+    renderAiRating(review.score);
+    renderAiReviews(review.quotes);
+  } catch (error) {
+    console.error('Failed to generate AI review', error);
+    if (!isActiveDetailRequest(bookId, requestId)) return;
+    renderAiRating(4);
+    renderAiReviews([]);
+  }
 }
 
 function animateScrollTo(container, targetY, durationMs = 420) {
@@ -299,13 +534,15 @@ function scrollDetailIntoViewIfStacked() {
   });
 }
 
-function renderBookDetail(book) {
+async function renderBookDetail(book) {
   if (!book) return;
 
   const id = String(book.id || '').trim();
   if (!id) return;
 
   state.selectedBookId = id;
+  state.detailRequestId += 1;
+  const requestId = state.detailRequestId;
 
   const empty = el('detailEmpty');
   const panel = el('detailPanel');
@@ -344,6 +581,58 @@ function renderBookDetail(book) {
 
   syncBorrowerDetails({ status, borrowerName, borrowerPhone });
   setBookDetailCover(book.cover_url);
+
+  setAiSummaryLoading();
+  setAiReviewLoading();
+
+  try {
+    const freshBook = await getBookById(id);
+    if (!isActiveDetailRequest(id, requestId)) return;
+
+    const freshTitle =
+      String(freshBook?.title || 'Untitled').trim() || 'Untitled';
+    const freshAuthor =
+      String(freshBook?.author || 'Unknown author').trim() || 'Unknown author';
+    const freshGenre = toGenreLabel(freshBook?.genre);
+    const freshStatus = String(freshBook?.status || 'available')
+      .trim()
+      .toLowerCase();
+    const freshPublishedYear =
+      String(freshBook?.published_year || '').trim() || 'N/A';
+    const freshBorrowerName = String(freshBook?.borrower_name || '').trim();
+    const freshBorrowerPhone = String(freshBook?.borrower_phone || '').trim();
+
+    if (titleEl) titleEl.textContent = freshTitle;
+    if (authorEl) authorEl.textContent = freshAuthor;
+    if (genreEl) genreEl.textContent = freshGenre;
+    if (publishedYearEl) publishedYearEl.textContent = freshPublishedYear;
+
+    if (statusEl) {
+      statusEl.textContent = toStatusLabel(freshStatus);
+      statusEl.classList.remove('badge-available', 'badge-borrowed');
+      statusEl.classList.add(
+        freshStatus === 'borrowed' ? 'badge-borrowed' : 'badge-available'
+      );
+    }
+
+    syncBorrowerDetails({
+      status: freshStatus,
+      borrowerName: freshBorrowerName,
+      borrowerPhone: freshBorrowerPhone,
+    });
+    setBookDetailCover(freshBook?.cover_url);
+
+    await Promise.all([
+      resolveBookSummary(freshBook, id, requestId),
+      resolveBookReview(freshBook, id, requestId),
+    ]);
+  } catch (error) {
+    console.error('Failed to load enriched book detail', error);
+    if (!isActiveDetailRequest(id, requestId)) return;
+    renderAiSummary('');
+    renderAiRating(4);
+    renderAiReviews([]);
+  }
 }
 
 function syncSelectedRowUi() {
@@ -576,7 +865,7 @@ function getBooksController() {
     loadBooksPage,
     openCreateModal: () => booksModals?.openCreateModal?.(),
     onSelectBook: (book) => {
-      renderBookDetail(book);
+      void renderBookDetail(book);
       syncSelectedRowUi();
       scrollDetailIntoViewIfStacked();
     },
@@ -650,7 +939,7 @@ async function loadBooksPage(pageNumber) {
       );
 
       if (selected) {
-        renderBookDetail(selected);
+        void renderBookDetail(selected);
       } else {
         state.selectedBookId = '';
         resetBookDetail();

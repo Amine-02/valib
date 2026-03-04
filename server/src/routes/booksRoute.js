@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   createBookHandler,
   deleteBookHandler,
+  generateBookReviewHandler,
+  generateBookSummaryHandler,
   getBooksCountHandler,
   getBookByIdHandler,
   getBooksHandler,
@@ -20,5 +22,7 @@ router.patch('/:id', updateBookHandler);
 router.delete('/:id', deleteBookHandler);
 router.post('/:id/checkout', checkOutBookHandler);
 router.post('/:id/checkin', checkInBookHandler);
+router.post('/:id/ai-summary', generateBookSummaryHandler);
+router.post('/:id/ai-review', generateBookReviewHandler);
 
 export default router;
