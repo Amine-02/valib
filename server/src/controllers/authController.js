@@ -1,7 +1,9 @@
 import {
+  createProfile,
   deleteAuthUserById,
   getAuthUserByAccessToken,
   getProfileById,
+  updateProfile,
 } from '../db/profilesQueries.js';
 
 function getBearerToken(req) {
@@ -16,6 +18,37 @@ function handleError(res, error) {
   }
 
   return res.status(500).json({ error: error?.message || 'Server error' });
+}
+
+function normalizeRole(value, fallback = 'viewer') {
+  const safe = String(value || '')
+    .trim()
+    .toLowerCase();
+
+  if (safe === 'admin' || safe === 'staff' || safe === 'viewer') {
+    return safe;
+  }
+
+  return fallback;
+}
+
+function getRoleFromAuthUser(authUser) {
+  return normalizeRole(
+    authUser?.app_metadata?.role || authUser?.user_metadata?.role,
+    'viewer'
+  );
+}
+
+function isDuplicateProfileError(error) {
+  const message = String(error?.message || '')
+    .trim()
+    .toLowerCase();
+
+  return (
+    error?.code === '23505' ||
+    message.includes('duplicate key') ||
+    message.includes('unique constraint')
+  );
 }
 
 async function getAuthUserFromRequest(req, res) {
@@ -75,5 +108,50 @@ export async function purgeUnauthorizedSelfHandler(req, res) {
     return res.json({ valid: false, deleted: true });
   } catch (error) {
     return handleError(res, error);
+  }
+}
+
+export async function completeSignupHandler(req, res) {
+  const authUser = await getAuthUserFromRequest(req, res);
+  if (!authUser) return;
+
+  const fullName = String(req.body?.full_name || '').trim();
+  const phone = String(req.body?.phone || '').trim();
+
+  if (!fullName || !phone) {
+    return res.status(400).json({ error: 'full_name and phone are required' });
+  }
+
+  const payload = {
+    id: authUser.id,
+    email: authUser.email,
+    full_name: fullName,
+    phone,
+    role: getRoleFromAuthUser(authUser),
+  };
+
+  try {
+    const updated = await updateProfile(authUser.id, payload);
+    return res.json(updated);
+  } catch (updateError) {
+    if (updateError?.code !== 'PGRST116') {
+      return handleError(res, updateError);
+    }
+  }
+
+  try {
+    const created = await createProfile(payload);
+    return res.status(201).json(created);
+  } catch (createError) {
+    if (!isDuplicateProfileError(createError)) {
+      return handleError(res, createError);
+    }
+
+    try {
+      const updated = await updateProfile(authUser.id, payload);
+      return res.json(updated);
+    } catch (retryError) {
+      return handleError(res, retryError);
+    }
   }
 }

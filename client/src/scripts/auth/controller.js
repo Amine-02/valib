@@ -1,5 +1,5 @@
-import { createProfile, updateProfile } from '/src/services/profilesService.js';
 import {
+  completeSignup,
   getSessionProfile,
   purgeUnauthorizedSelf,
 } from '/src/services/authService.js';
@@ -184,18 +184,6 @@ function isProfileMissingError(error) {
   );
 }
 
-function isDuplicateProfileError(error) {
-  const message = String(error?.message || '')
-    .trim()
-    .toLowerCase();
-  return (
-    message.includes('duplicate key') ||
-    message.includes('unique constraint') ||
-    message.includes('already exists') ||
-    message.includes('request failed (409)')
-  );
-}
-
 async function getSessionAccessToken(client) {
   if (!client) return '';
 
@@ -286,36 +274,6 @@ async function enforceInvitedAccount(client, user, feedbackEl) {
   await client.auth.signOut();
   setMessage(feedbackEl, INVITE_REQUIRED_MESSAGE);
   return false;
-}
-
-async function upsertProfileFromSignup({
-  userId,
-  email,
-  fullName,
-  phone,
-  role,
-}) {
-  const payload = {
-    id: userId,
-    email,
-    full_name: fullName,
-    phone,
-    role,
-  };
-
-  try {
-    await updateProfile(userId, payload);
-    return;
-  } catch (updateError) {
-    if (!isProfileMissingError(updateError)) throw updateError;
-  }
-
-  try {
-    await createProfile(payload);
-  } catch (createError) {
-    if (!isDuplicateProfileError(createError)) throw createError;
-    await updateProfile(userId, payload);
-  }
 }
 
 export async function bindSignInForm() {
@@ -647,12 +605,14 @@ export async function bindSignUpForm() {
         await client.auth.updateUser(updateUserPayload);
       if (updateAuthError) throw updateAuthError;
 
-      await upsertProfileFromSignup({
-        userId: inviteUser.id,
-        email,
-        fullName,
+      const sessionAccessToken = await getSessionAccessToken(client);
+      if (!sessionAccessToken) {
+        throw new Error('Missing session access token');
+      }
+
+      await completeSignup(sessionAccessToken, {
+        full_name: fullName,
         phone,
-        role: invitedRole,
       });
 
       setMessage(feedback, 'Account setup complete. Redirecting...', 'success');

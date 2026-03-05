@@ -25,3 +25,11 @@ export function purgeUnauthorizedSelf(accessToken) {
     headers: withBearerToken(accessToken),
   });
 }
+
+export function completeSignup(accessToken, payload = {}) {
+  return requestJson(`${AUTH_API}/complete-signup`, {
+    method: 'POST',
+    headers: withBearerToken(accessToken),
+    body: JSON.stringify(payload),
+  });
+}
