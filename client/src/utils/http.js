@@ -13,16 +13,17 @@ export function buildQuery(params = {}) {
 }
 
 export async function requestJson(url, options = {}) {
+  const { headers: optionHeaders = {}, ...restOptions } = options;
   const role = getActiveUserRole();
   const headers = {
     'Content-Type': 'application/json',
     [USER_ROLE_HEADER]: role,
-    ...(options.headers ?? {}),
+    ...optionHeaders,
   };
 
   const response = await fetch(url, {
+    ...restOptions,
     headers,
-    ...options,
   });
 
   const payload = await response.json().catch(() => null);
