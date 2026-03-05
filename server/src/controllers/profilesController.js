@@ -1,6 +1,8 @@
 import {
   createProfile,
+  deleteAuthUserById,
   deleteProfile,
+  getAuthUserByAccessToken,
   getAllProfiles,
   getProfileById,
   getProfilesCount,
@@ -60,6 +62,12 @@ function isInviteAuthorized(req) {
   return incoming === expected;
 }
 
+function getBearerToken(req) {
+  const authHeader = String(req.headers?.authorization || '').trim();
+  if (!authHeader.toLowerCase().startsWith('bearer ')) return '';
+  return authHeader.slice(7).trim();
+}
+
 export async function getProfilesHandler(req, res) {
   if (!validateRoleForFilter(req, res)) return;
 
@@ -91,6 +99,40 @@ export async function getProfileByIdHandler(req, res) {
   }
 }
 
+export async function purgeUnauthorizedSelfHandler(req, res) {
+  const accessToken = getBearerToken(req);
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Missing bearer token' });
+  }
+
+  let authUser;
+  try {
+    authUser = await getAuthUserByAccessToken(accessToken);
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired session' });
+  }
+
+  if (!authUser?.id) {
+    return res.status(401).json({ error: 'Invalid or expired session' });
+  }
+
+  try {
+    await getProfileById(authUser.id);
+    return res.json({ valid: true, deleted: false });
+  } catch (error) {
+    if (error?.code !== 'PGRST116') {
+      return handleError(res, error);
+    }
+  }
+
+  try {
+    await deleteAuthUserById(authUser.id);
+    return res.json({ valid: false, deleted: true });
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 export async function createProfileHandler(req, res) {
   const { full_name: fullName, email } = req.body ?? {};
   if (!fullName || !email) {
@@ -115,6 +157,10 @@ export async function createProfileHandler(req, res) {
 export async function updateProfileHandler(req, res) {
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({ error: 'Update payload is required' });
+  }
+
+  if (req.body?.email !== undefined) {
+    return res.status(400).json({ error: 'email cannot be updated' });
   }
 
   if (!validateRoleForBody(req, res)) return;

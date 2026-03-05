@@ -1,0 +1,359 @@
+<section class="page-shell p-4 md:p-6">
+  <div class="dashboard-shell mx-auto max-w-7xl space-y-6">
+    <header class="space-y-2">
+      <h1 class="section-title">Users</h1>
+      <p id="users-results-meta" class="section-subtitle">Manage invited users and profile information.</p>
+
+      <div class="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="w-full lg:max-w-md">
+          <label for="users-search-input" class="sr-only">Search users</label>
+          <div class="relative">
+            <input
+              id="users-search-input"
+              type="text"
+              placeholder="Search name, email, or role"
+              autocomplete="off"
+              class="border-border bg-surface text-text placeholder:text-text-soft focus:border-primary-400 focus:ring-primary-200 w-full rounded-xl border px-3 py-2 pr-14 text-sm focus:ring-2" />
+            <button
+              id="users-search-clear"
+              type="button"
+              class="text-text-soft hover:text-text absolute top-1/2 right-2 hidden -translate-y-1/2 rounded-md px-2 py-1 text-xs font-semibold"
+              aria-label="Clear users search">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+          <label class="sr-only" for="users-role-filter-trigger">Filter by role</label>
+          <div id="users-role-filter-root" class="relative sm:w-44">
+            <input id="users-role-filter" type="hidden" value="" />
+
+            <button
+              id="users-role-filter-trigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+              <span id="users-role-filter-label">All roles</span>
+              <svg
+                id="users-role-filter-chevron"
+                viewBox="0 0 20 20"
+                fill="none"
+                class="text-text-soft h-4 w-4 shrink-0 transition-transform"
+                stroke="currentColor"
+                stroke-width="2">
+                <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+
+            <div
+              id="users-role-filter-menu"
+              role="listbox"
+              class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+              <button
+                type="button"
+                role="option"
+                data-role-option=""
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                All roles
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-role-option="admin"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Admin
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-role-option="staff"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Staff
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-role-option="viewer"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Viewer
+              </button>
+            </div>
+          </div>
+
+          <button
+            id="users-invite-button"
+            type="button"
+            class="btn-primary w-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap sm:w-auto">
+            Invite user
+          </button>
+        </div>
+      </div>
+
+      <p id="users-feedback" class="hidden text-sm font-medium"></p>
+    </header>
+
+    <div class="table-shell">
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left">
+          <thead class="bg-surface-muted">
+            <tr class="text-text-soft text-xs font-bold tracking-wide uppercase">
+              <th class="px-5 py-4">Full name</th>
+              <th class="px-5 py-4">Email</th>
+              <th class="px-5 py-4">Phone</th>
+              <th class="px-5 py-4">Role</th>
+              <th class="px-5 py-4">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody id="users-table-body" class="divide-border divide-y"></tbody>
+        </table>
+      </div>
+
+      <div class="border-border flex items-center justify-center gap-3 border-t px-5 py-4 sm:justify-between">
+        <p id="users-pagination-meta" class="text-text-muted hidden text-sm sm:block">Showing 0-0 of 0 users</p>
+
+        <div class="flex items-center gap-2">
+          <button
+            id="users-prev-page"
+            type="button"
+            class="btn-secondary px-3 py-1.5 text-xs"
+            aria-label="Previous page">
+            Previous
+          </button>
+
+          <div class="text-text flex items-center gap-1 text-sm font-semibold">
+            <span>Page</span>
+            <label class="sr-only" for="users-page-input">Go to page number</label>
+            <input
+              id="users-page-input"
+              type="number"
+              min="1"
+              step="1"
+              value="1"
+              inputmode="numeric"
+              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 no-spinner h-6 w-9 rounded-lg border px-1 text-center text-sm font-semibold focus:ring-2"
+              aria-label="Current page number" />
+            <span>/</span>
+            <span id="users-page-total">1</span>
+          </div>
+
+          <button id="users-next-page" type="button" class="btn-secondary px-3 py-1.5 text-xs" aria-label="Next page">
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="users-invite-modal-overlay"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/25 p-4 backdrop-blur-[2px]"
+    aria-hidden="true">
+    <div
+      id="users-invite-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="users-invite-modal-title"
+      class="border-border bg-surface w-full max-w-md rounded-2xl border shadow-2xl">
+      <div class="border-border flex items-center justify-between border-b px-5 py-4">
+        <h2 id="users-invite-modal-title" class="text-text text-lg font-semibold">Invite user</h2>
+        <button
+          id="users-invite-close"
+          type="button"
+          class="text-text-soft hover:text-text rounded-md p-1"
+          aria-label="Close invite modal">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="m6 6 12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="users-invite-form" class="space-y-4 px-5 py-4" novalidate>
+        <div class="space-y-1.5">
+          <label for="users-invite-email" class="text-text text-sm font-medium">Email</label>
+          <input
+            id="users-invite-email"
+            type="email"
+            autocomplete="email"
+            required
+            class="border-border bg-surface text-text placeholder:text-text-soft focus:border-primary-400 focus:ring-primary-200 w-full rounded-xl border px-3 py-2 text-sm focus:ring-2"
+            placeholder="name@example.com" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="users-invite-role-trigger" class="text-text text-sm font-medium">Role</label>
+          <div id="users-invite-role-root" class="relative">
+            <input id="users-invite-role" type="hidden" value="viewer" />
+
+            <button
+              id="users-invite-role-trigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+              <span id="users-invite-role-label">Viewer</span>
+              <svg
+                id="users-invite-role-chevron"
+                viewBox="0 0 20 20"
+                fill="none"
+                class="text-text-soft h-4 w-4 shrink-0 transition-transform"
+                stroke="currentColor"
+                stroke-width="2">
+                <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+
+            <div
+              id="users-invite-role-menu"
+              role="listbox"
+              class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+              <button
+                type="button"
+                role="option"
+                data-invite-role-option="viewer"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Viewer
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-invite-role-option="staff"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Staff
+              </button>
+              <button
+                type="button"
+                role="option"
+                data-invite-role-option="admin"
+                class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                Admin
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p id="users-invite-feedback" class="hidden text-sm font-medium"></p>
+
+        <div class="flex justify-end gap-2">
+          <button id="users-invite-cancel" type="button" class="btn-secondary px-4 py-2 text-sm">Cancel</button>
+          <button id="users-invite-submit" type="submit" class="btn-primary px-4 py-2 text-sm">Send invite</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div
+    id="users-edit-modal-overlay"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/25 p-4 backdrop-blur-[2px]"
+    aria-hidden="true">
+    <div
+      id="users-edit-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="users-edit-modal-title"
+      class="border-border bg-surface w-full max-w-lg rounded-2xl border shadow-2xl">
+      <div class="border-border flex items-center justify-between border-b px-5 py-4">
+        <h2 id="users-edit-modal-title" class="text-text text-lg font-semibold">Edit user</h2>
+        <button
+          id="users-edit-close"
+          type="button"
+          class="text-text-soft hover:text-text rounded-md p-1"
+          aria-label="Close edit modal">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="m6 6 12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="users-edit-form" class="space-y-4 px-5 py-4" novalidate>
+        <input id="users-edit-id" type="hidden" />
+
+        <div class="space-y-1.5">
+          <label for="users-edit-full-name" class="text-text text-sm font-medium">Full name</label>
+          <input
+            id="users-edit-full-name"
+            type="text"
+            autocomplete="name"
+            required
+            class="border-border bg-surface text-text placeholder:text-text-soft focus:border-primary-400 focus:ring-primary-200 w-full rounded-xl border px-3 py-2 text-sm focus:ring-2"
+            placeholder="User full name" />
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="space-y-1.5">
+            <label for="users-edit-phone" class="text-text text-sm font-medium">Phone</label>
+            <input
+              id="users-edit-phone"
+              type="tel"
+              autocomplete="tel"
+              class="border-border bg-surface text-text placeholder:text-text-soft focus:border-primary-400 focus:ring-primary-200 w-full rounded-xl border px-3 py-2 text-sm focus:ring-2"
+              placeholder="(514) 123-4567" />
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="users-edit-role-trigger" class="text-text text-sm font-medium">Role</label>
+            <div id="users-edit-role-root" class="relative">
+              <input id="users-edit-role" type="hidden" value="viewer" />
+
+              <button
+                id="users-edit-role-trigger"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                class="border-border bg-surface text-text focus:border-primary-400 focus:ring-primary-200 hover:border-primary-300 inline-flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition focus:ring-2">
+                <span id="users-edit-role-label">Viewer</span>
+                <svg
+                  id="users-edit-role-chevron"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  class="text-text-soft h-4 w-4 shrink-0 transition-transform"
+                  stroke="currentColor"
+                  stroke-width="2">
+                  <path d="m5 7 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+
+              <div
+                id="users-edit-role-menu"
+                role="listbox"
+                class="border-border bg-surface absolute z-20 mt-2 hidden w-full overflow-hidden rounded-xl border py-1 shadow-md">
+                <button
+                  type="button"
+                  role="option"
+                  data-edit-role-option="viewer"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Viewer
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-edit-role-option="staff"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Staff
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  data-edit-role-option="admin"
+                  class="text-text hover:bg-primary-50 hover:text-primary-800 w-full px-3 py-2 text-left text-sm transition">
+                  Admin
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p id="users-edit-feedback" class="hidden text-sm font-medium"></p>
+
+        <div class="flex justify-end gap-2">
+          <button id="users-edit-cancel" type="button" class="btn-secondary px-4 py-2 text-sm">Cancel</button>
+          <button id="users-edit-submit" type="submit" class="btn-primary px-4 py-2 text-sm">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

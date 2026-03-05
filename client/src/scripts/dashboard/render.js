@@ -3,6 +3,7 @@ import {
   getBooks,
   getBooksCount,
 } from '/src/services/booksService.js';
+import { getProfilesCount } from '/src/services/profilesService.js';
 import {
   getOverdueBooks,
   getTransactions,
@@ -13,7 +14,6 @@ import { clearLoaderState, showCenteredLoader } from '/src/utils/loader.js';
 import { formatNumber } from '/src/utils/number.js';
 import { escapeHtml } from '/src/utils/string.js';
 
-const USERS_PLACEHOLDER_COUNT = 128;
 const RECENT_ACTIVITY_LIMIT = 10;
 const POPULAR_BOOKS_LIMIT = 10;
 const STAT_LOADER_CLASSES = [
@@ -329,21 +329,24 @@ export async function renderDashboard() {
       checkedOutCountResult = {},
       transactions = [],
       overdueBooks = [],
+      usersCountResult = {},
     ] = await Promise.all([
       getBooks(),
       getBooksCount(),
       getBooksCount({ status: 'borrowed' }),
       getTransactions(),
       getOverdueBooks(),
+      getProfilesCount(),
     ]);
 
     const totalBooks = Number(booksCountResult?.count) || 0;
     const checkedOutBooksCount = Number(checkedOutCountResult?.count) || 0;
+    const usersCount = Number(usersCountResult?.count) || 0;
 
     setStatValue('Total books', totalBooks);
     setStatValue('Checked out books', checkedOutBooksCount);
     setStatValue('Overdue books', overdueBooks.length);
-    setStatValue('Number of users', USERS_PLACEHOLDER_COUNT);
+    setStatValue('Number of users', usersCount);
 
     const recentActivityItems = await buildRecentActivityItems(transactions);
 
@@ -354,7 +357,7 @@ export async function renderDashboard() {
     setStatValue('Total books', 0);
     setStatValue('Checked out books', 0);
     setStatValue('Overdue books', 0);
-    setStatValue('Number of users', USERS_PLACEHOLDER_COUNT);
+    setStatValue('Number of users', 0);
     renderRecentActivity([]);
     renderPopularBooks([], []);
   }

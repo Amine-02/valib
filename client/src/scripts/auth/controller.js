@@ -1,6 +1,7 @@
 import {
   createProfile,
   getProfileById,
+  purgeUnauthorizedSelf,
   updateProfile,
 } from '/src/services/profilesService.js';
 import { formatPhoneNumber } from '/src/utils/phone.js';
@@ -262,6 +263,16 @@ async function enforceInvitedAccount(client, user, feedbackEl) {
 
   const hasProfile = await userHasProfile(user.id);
   if (hasProfile) return true;
+
+  try {
+    const { data } = await client.auth.getSession();
+    const accessToken = String(data?.session?.access_token || '').trim();
+    if (accessToken) {
+      await purgeUnauthorizedSelf(accessToken);
+    }
+  } catch {
+    // Ignore cleanup failures; sign-out + message still enforce invite-only access.
+  }
 
   await client.auth.signOut();
   setMessage(feedbackEl, INVITE_REQUIRED_MESSAGE);

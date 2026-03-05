@@ -118,6 +118,28 @@ export async function getProfileById(profileId) {
   return data;
 }
 
+export async function getAuthUserByAccessToken(accessToken) {
+  const safeAccessToken = String(accessToken || '').trim();
+  if (!safeAccessToken) {
+    throw new Error('Missing access token');
+  }
+
+  const { data, error } = await supabaseAdmin.auth.getUser(safeAccessToken);
+  if (error) throw error;
+
+  return data?.user || null;
+}
+
+export async function deleteAuthUserById(userId) {
+  const safeUserId = String(userId || '').trim();
+  if (!safeUserId) {
+    throw new Error('Missing user id');
+  }
+
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(safeUserId);
+  if (error) throw error;
+}
+
 export async function createProfile(profile) {
   const payload = buildProfilePayload(profile);
 

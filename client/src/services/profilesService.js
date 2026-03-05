@@ -34,11 +34,27 @@ export function deleteProfile(profileId) {
   });
 }
 
+export function purgeUnauthorizedSelf(accessToken) {
+  const safeAccessToken = String(accessToken || '').trim();
+  const headers = {};
+  if (safeAccessToken) {
+    headers.Authorization = `Bearer ${safeAccessToken}`;
+  }
+
+  return requestJson(`${PROFILES_API}/purge-unauthorized-self`, {
+    method: 'POST',
+    headers,
+  });
+}
+
 export function inviteProfile(
-  { email, role = 'viewer', redirect_to = '' } = {},
+  { email, role = 'viewer' } = {},
   { inviteKey = '' } = {}
 ) {
-  const headers = {};
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
   const safeInviteKey = String(inviteKey || '').trim();
   if (safeInviteKey) {
     headers['x-invite-key'] = safeInviteKey;
@@ -47,6 +63,6 @@ export function inviteProfile(
   return requestJson(`${PROFILES_API}/invite`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ email, role, redirect_to }),
+    body: JSON.stringify({ email, role }),
   });
 }

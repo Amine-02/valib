@@ -1,6 +1,9 @@
 <section class="page-shell flex min-h-full items-center justify-center p-4 md:p-6">
   <div class="dashboard-shell w-full max-w-xl space-y-6">
     <header class="space-y-1 text-center">
+      <a id="logo-link" href="/" class="inline-flex items-center rounded-sm px-3 py-2 transition active:scale-95">
+        <img src="/assets/valib_logo.png" alt="Valib logo" class="h-10 w-auto object-contain" />
+      </a>
       <h1 class="section-title">Complete sign up</h1>
       <p id="sign-up-subtitle" class="section-subtitle">
         Use your invite link, set your password, and finish your profile.
@@ -63,12 +66,9 @@
         </div>
       </div>
 
-      <p id="sign-up-feedback" class="hidden text-sm text-center font-medium"></p>
+      <p id="sign-up-feedback" class="hidden text-center text-sm font-medium"></p>
 
-      <button
-        id="sign-up-google-link"
-        type="button"
-        class="btn-secondary w-full py-2.5 text-sm font-semibold">
+      <button id="sign-up-google-link" type="button" class="btn-secondary w-full py-2.5 text-sm font-semibold">
         Link Google account
       </button>
 

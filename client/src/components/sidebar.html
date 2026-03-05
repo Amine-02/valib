@@ -1,21 +1,13 @@
 <nav
   aria-label="Sidebar"
-  class="sidebar fixed top-16 left-0 z-40 h-[calc(100vh-4rem)] w-72 border-r border-border p-4 shadow-sm lg:static lg:top-0 lg:h-full lg:shadow-none">
+  class="sidebar border-border fixed top-16 left-0 z-40 h-[calc(100vh-4rem)] w-72 border-r p-4 shadow-sm lg:static lg:top-0 lg:h-full lg:shadow-none">
   <ul role="list" class="flex flex-col gap-2">
     <li>
       <a
         href="/app"
         data-route="dashboard"
         class="tab-link text-text-muted hover:bg-primary-50 hover:text-primary-800 aria-[current=page]:bg-primary-100 aria-[current=page]:text-primary-800 group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.75"
-          class="h-5 w-5 shrink-0">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M12 3v18" />
-        </svg>
+        <span class="material-symbols-outlined text-inherit">dashboard</span>
         Dashboard
       </a>
     </li>
@@ -25,19 +17,7 @@
         href="/app/books"
         data-route="books"
         class="tab-link text-text-muted hover:bg-primary-50 hover:text-primary-800 aria-[current=page]:bg-primary-100 aria-[current=page]:text-primary-800 group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.75"
-          class="h-5 w-5 shrink-0">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M6 4.5h9a3 3 0 0 1 3 3V20l-4-2-4 2V7.5a3 3 0 0 0-3-3Z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5a3 3 0 0 0 0 6h4" />
-        </svg>
+        <span class="material-symbols-outlined text-inherit">book_2</span>
         Books
       </a>
     </li>
@@ -47,20 +27,18 @@
         href="/app/activties"
         data-route="activties"
         class="tab-link text-text-muted hover:bg-primary-50 hover:text-primary-800 aria-[current=page]:bg-primary-100 aria-[current=page]:text-primary-800 group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.75"
-          class="h-5 w-5 shrink-0">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10M7 12h10M7 17h6" />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4.5 3.75h15A1.5 1.5 0 0 1 21 5.25v13.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.75V5.25a1.5 1.5 0 0 1 1.5-1.5Z" />
-        </svg>
+        <span class="material-symbols-outlined text-inherit">browse_activity</span>
         Activities
+      </a>
+    </li>
+
+    <li>
+      <a
+        href="/app/users"
+        data-route="users"
+        class="tab-link text-text-muted hover:bg-primary-50 hover:text-primary-800 aria-[current=page]:bg-primary-100 aria-[current=page]:text-primary-800 group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition">
+        <span class="material-symbols-outlined text-inherit">group</span>
+        Users
       </a>
     </li>
   </ul>

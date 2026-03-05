@@ -23,6 +23,7 @@ const IDS = {
   nextPage: 'activities-next-page',
   pageInput: 'activities-page-input',
   pageTotal: 'activities-page-total',
+  activitiesView: 'view-activities',
   searchInput: 'activities-search-input',
   searchClear: 'activities-search-clear',
   actionInput: 'activities-filter-action',
@@ -445,8 +446,14 @@ function filterActivitiesBySearch(activities, booksById) {
   return filtered.map((row) => row.activity);
 }
 
-function scrollToTop() {
-  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+function scrollActivitiesViewToTop() {
+  const view = el('activitiesView');
+  if (view instanceof HTMLElement) {
+    view.scrollTo({ top: 0, left: 0 });
+    return;
+  }
+
+  window.scrollTo({ top: 0, left: 0 });
 }
 
 async function loadActivitiesPage(pageNumber) {
@@ -534,8 +541,8 @@ async function loadActivitiesPage(pageNumber) {
   } finally {
     state.loading = false;
     updatePaginationUi(rowCount);
-    if (state.page !== previousPage) {
-      scrollToTop();
+    if (requestedPage !== previousPage) {
+      scrollActivitiesViewToTop();
     }
   }
 }

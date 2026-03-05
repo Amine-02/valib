@@ -1,12 +1,14 @@
 import dashboardTemplate from '/src/components/dashboard.html?raw';
 import booksTemplate from '/src/components/books.html?raw';
 import activitiesTemplate from '/src/components/activities.html?raw';
+import usersTemplate from '/src/components/users.html?raw';
 import signInTemplate from '/src/components/sign-in.html?raw';
 import signUpTemplate from '/src/components/sign-up.html?raw';
 
 import { setupDashboard } from '/src/scripts/dashboard/index.js';
 import { setupBooks } from '/src/scripts/books/index.js';
 import { setupActivities } from '/src/scripts/activities/index.js';
+import { setupUsers } from '/src/scripts/users/index.js';
 import { setupSignIn, setupSignUp } from '/src/scripts/auth/index.js';
 
 export const ROUTE_CONFIG = {
@@ -28,6 +30,13 @@ export const ROUTE_CONFIG = {
     viewId: 'view-activities',
     template: activitiesTemplate,
     loader: setupActivities,
+    layout: 'app',
+  },
+
+  users: {
+    viewId: 'view-users',
+    template: usersTemplate,
+    loader: setupUsers,
     layout: 'app',
   },
 
