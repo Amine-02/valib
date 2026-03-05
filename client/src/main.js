@@ -2,6 +2,7 @@ import sidebarTemplate from '/src/components/sidebar.html?raw';
 import headerTemplate from '/src/components/header.html?raw';
 import { ROUTE_CONFIG } from '/src/configs/routes.js';
 import { getSessionProfile } from '/src/services/authService.js';
+import { appState } from '/src/state.js';
 import { clearActiveUserRole, setActiveUserRole } from '/src/utils/role.js';
 import { isDropdownOpen, setDropdownOpen } from '/src/utils/dropdown.js';
 import { getSupabaseBrowserClient } from '/src/utils/supabase.js';
@@ -30,10 +31,6 @@ const ROUTE_ACCESS_BY_ROLE = {
 const headerAuthState = {
   client: null,
   subscription: null,
-};
-const accessState = {
-  isAuthenticated: false,
-  role: ROLE_FALLBACK,
 };
 const permissionObserverState = {
   bound: false,
@@ -67,12 +64,22 @@ function getAllowedRoutesForRole(role = ROLE_FALLBACK) {
 }
 
 function getAuthorizedRoute(route) {
-  const role = accessState.isAuthenticated
-    ? normalizeRole(accessState.role, ROLE_FALLBACK)
-    : 'viewer';
+  const role = appState.isAuthenticated
+    ? normalizeRole(appState.role, ROLE_FALLBACK)
+    : ROLE_FALLBACK;
   const fallbackRoute = getDefaultRouteForRole(role);
+
+  if (!appState.isAuthenticated) {
+    if (AUTH_ROUTES.has(route)) return route;
+    return getAllowedRoutesForRole(role).has(route) ? route : fallbackRoute;
+  }
+
+  if (appState.onboardingRequired) {
+    return 'sign-up';
+  }
+
   if (AUTH_ROUTES.has(route)) {
-    return accessState.isAuthenticated ? fallbackRoute : route;
+    return fallbackRoute;
   }
 
   return getAllowedRoutesForRole(role).has(route) ? route : fallbackRoute;
@@ -81,12 +88,14 @@ function getAuthorizedRoute(route) {
 function setAccessState({
   isAuthenticated = false,
   role = ROLE_FALLBACK,
+  onboardingRequired = false,
 } = {}) {
-  accessState.isAuthenticated = !!isAuthenticated;
-  accessState.role = normalizeRole(role, ROLE_FALLBACK);
+  appState.isAuthenticated = !!isAuthenticated;
+  appState.role = normalizeRole(role, ROLE_FALLBACK);
+  appState.onboardingRequired = !!onboardingRequired;
 
-  if (accessState.isAuthenticated) {
-    setActiveUserRole(accessState.role);
+  if (appState.isAuthenticated) {
+    setActiveUserRole(appState.role);
     return;
   }
 
@@ -100,7 +109,7 @@ function applyRuleToElement(element, hide) {
 }
 
 function applyPermissions(container = document) {
-  const role = normalizeRole(accessState.role, ROLE_FALLBACK);
+  const role = normalizeRole(appState.role, ROLE_FALLBACK);
   const removeSidebarUi = role === 'viewer';
   const canAccessUsers = role === 'admin';
   const canAccessDashboard = role === 'admin' || role === 'staff';
@@ -309,6 +318,12 @@ function setHeaderAuthUi(isAuthenticated) {
   }
 }
 
+function isProfileSetupComplete(profile) {
+  const fullName = String(profile?.full_name || '').trim();
+  const phone = String(profile?.phone || '').trim();
+  return !!(fullName && phone);
+}
+
 async function getHeaderProfile(user) {
   const client = getHeaderAuthClient();
   if (!client || !user?.id) return null;
@@ -341,7 +356,11 @@ function fillHeaderUserFields(user, profile) {
 async function refreshHeaderAuthUi() {
   const client = getHeaderAuthClient();
   if (!client) {
-    setAccessState({ isAuthenticated: false, role: ROLE_FALLBACK });
+    setAccessState({
+      isAuthenticated: false,
+      role: ROLE_FALLBACK,
+      onboardingRequired: false,
+    });
     setHeaderAuthUi(false);
     applyPermissions(document);
     return;
@@ -350,7 +369,11 @@ async function refreshHeaderAuthUi() {
   try {
     const { data, error } = await client.auth.getUser();
     if (error || !data?.user) {
-      setAccessState({ isAuthenticated: false, role: ROLE_FALLBACK });
+      setAccessState({
+        isAuthenticated: false,
+        role: ROLE_FALLBACK,
+        onboardingRequired: false,
+      });
       setHeaderAuthUi(false);
       applyPermissions(document);
       return;
@@ -360,6 +383,7 @@ async function refreshHeaderAuthUi() {
     setAccessState({
       isAuthenticated: true,
       role: resolveUserRole(data.user),
+      onboardingRequired: true,
     });
 
     let profile = null;
@@ -371,11 +395,16 @@ async function refreshHeaderAuthUi() {
     setAccessState({
       isAuthenticated: true,
       role: normalizeRole(profile?.role || resolveUserRole(data.user)),
+      onboardingRequired: !isProfileSetupComplete(profile),
     });
     fillHeaderUserFields(data.user, profile);
     applyPermissions(document);
   } catch {
-    setAccessState({ isAuthenticated: false, role: ROLE_FALLBACK });
+    setAccessState({
+      isAuthenticated: false,
+      role: ROLE_FALLBACK,
+      onboardingRequired: false,
+    });
     setHeaderAuthUi(false);
     applyPermissions(document);
   }

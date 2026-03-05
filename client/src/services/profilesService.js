@@ -34,19 +34,6 @@ export function deleteProfile(profileId) {
   });
 }
 
-export function purgeUnauthorizedSelf(accessToken) {
-  const safeAccessToken = String(accessToken || '').trim();
-  const headers = {};
-  if (safeAccessToken) {
-    headers.Authorization = `Bearer ${safeAccessToken}`;
-  }
-
-  return requestJson(`${PROFILES_API}/purge-unauthorized-self`, {
-    method: 'POST',
-    headers,
-  });
-}
-
 export function inviteProfile(
   { email, role = 'viewer' } = {},
   { inviteKey = '' } = {}
