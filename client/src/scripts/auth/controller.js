@@ -1,9 +1,8 @@
+import { createProfile, updateProfile } from '/src/services/profilesService.js';
 import {
-  createProfile,
-  getProfileById,
+  getSessionProfile,
   purgeUnauthorizedSelf,
-  updateProfile,
-} from '/src/services/profilesService.js';
+} from '/src/services/authService.js';
 import { formatPhoneNumber } from '/src/utils/phone.js';
 import { getSupabaseBrowserClient } from '/src/utils/supabase.js';
 
@@ -197,13 +196,14 @@ function isDuplicateProfileError(error) {
   );
 }
 
-async function userHasProfile(userId) {
+async function getSessionAccessToken(client) {
+  if (!client) return '';
+
   try {
-    await getProfileById(userId);
-    return true;
-  } catch (error) {
-    if (isProfileMissingError(error)) return false;
-    throw error;
+    const { data } = await client.auth.getSession();
+    return String(data?.session?.access_token || '').trim();
+  } catch {
+    return '';
   }
 }
 
@@ -261,15 +261,24 @@ async function getAuthSessionUser(
 async function enforceInvitedAccount(client, user, feedbackEl) {
   if (!user?.id) return false;
 
-  const hasProfile = await userHasProfile(user.id);
-  if (hasProfile) return true;
+  const accessToken = await getSessionAccessToken(client);
+  if (!accessToken) {
+    await client.auth.signOut();
+    setMessage(feedbackEl, INVITE_REQUIRED_MESSAGE);
+    return false;
+  }
 
   try {
-    const { data } = await client.auth.getSession();
-    const accessToken = String(data?.session?.access_token || '').trim();
-    if (accessToken) {
-      await purgeUnauthorizedSelf(accessToken);
+    await getSessionProfile(accessToken);
+    return true;
+  } catch (error) {
+    if (!isProfileMissingError(error)) {
+      throw error;
     }
+  }
+
+  try {
+    await purgeUnauthorizedSelf(accessToken);
   } catch {
     // Ignore cleanup failures; sign-out + message still enforce invite-only access.
   }

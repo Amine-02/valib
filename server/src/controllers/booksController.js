@@ -16,11 +16,32 @@ import { createBookTransaction } from '../db/transactionsQueries.js';
 
 const BORROWED_STATUS = 'borrowed';
 const AVAILABLE_STATUS = 'available';
+const VIEWER_ROLE = 'viewer';
 
 function normalizeStatus(value) {
   return String(value || '')
     .trim()
     .toLowerCase();
+}
+
+function hideBorrowerFields(book) {
+  if (!book || typeof book !== 'object') return book;
+
+  const safeBook = { ...book };
+  delete safeBook.borrower_name;
+  delete safeBook.borrower_phone;
+  return safeBook;
+}
+
+function sanitizeBookForRole(book, role) {
+  if (String(role || '') !== VIEWER_ROLE) return book;
+  return hideBorrowerFields(book);
+}
+
+function sanitizeBooksForRole(books, role) {
+  if (!Array.isArray(books)) return books;
+  if (String(role || '') !== VIEWER_ROLE) return books;
+  return books.map((book) => hideBorrowerFields(book));
 }
 
 async function logBookStatusTransaction(book, action, { fromBook } = {}) {
@@ -61,7 +82,7 @@ function handleError(res, error) {
 export async function getBooksHandler(req, res) {
   try {
     const books = await getAllBooks(req.query);
-    res.json(books);
+    res.json(sanitizeBooksForRole(books, req.userRole));
   } catch (error) {
     handleError(res, error);
   }
@@ -79,7 +100,7 @@ export async function getBooksCountHandler(req, res) {
 export async function getBookByIdHandler(req, res) {
   try {
     const book = await getBookById(req.params.id);
-    res.json(book);
+    res.json(sanitizeBookForRole(book, req.userRole));
   } catch (error) {
     handleError(res, error);
   }

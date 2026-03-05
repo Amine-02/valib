@@ -11,17 +11,22 @@ import {
   checkOutBookHandler,
   updateBookHandler,
 } from '../controllers/booksController.js';
+import { requireRoles } from '../middlewares/access.js';
 
 const router = Router();
 
 router.get('/', getBooksHandler);
 router.get('/count', getBooksCountHandler);
 router.get('/:id', getBookByIdHandler);
-router.post('/', createBookHandler);
-router.patch('/:id', updateBookHandler);
-router.delete('/:id', deleteBookHandler);
-router.post('/:id/checkout', checkOutBookHandler);
-router.post('/:id/checkin', checkInBookHandler);
+router.post('/', requireRoles('admin', 'staff'), createBookHandler);
+router.patch('/:id', requireRoles('admin', 'staff'), updateBookHandler);
+router.delete('/:id', requireRoles('admin', 'staff'), deleteBookHandler);
+router.post(
+  '/:id/checkout',
+  requireRoles('admin', 'staff'),
+  checkOutBookHandler
+);
+router.post('/:id/checkin', requireRoles('admin', 'staff'), checkInBookHandler);
 router.post('/:id/ai-summary', generateBookSummaryHandler);
 router.post('/:id/ai-review', generateBookReviewHandler);
 

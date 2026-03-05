@@ -1,3 +1,5 @@
+import { getActiveUserRole, USER_ROLE_HEADER } from '/src/utils/role.js';
+
 export function buildQuery(params = {}) {
   const searchParams = new URLSearchParams();
 
@@ -11,11 +13,15 @@ export function buildQuery(params = {}) {
 }
 
 export async function requestJson(url, options = {}) {
+  const role = getActiveUserRole();
+  const headers = {
+    'Content-Type': 'application/json',
+    [USER_ROLE_HEADER]: role,
+    ...(options.headers ?? {}),
+  };
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+    headers,
     ...options,
   });
 

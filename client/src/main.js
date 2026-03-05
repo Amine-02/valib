@@ -1,7 +1,8 @@
 import sidebarTemplate from '/src/components/sidebar.html?raw';
 import headerTemplate from '/src/components/header.html?raw';
 import { ROUTE_CONFIG } from '/src/configs/routes.js';
-import { getProfileById } from '/src/services/profilesService.js';
+import { getSessionProfile } from '/src/services/authService.js';
+import { clearActiveUserRole, setActiveUserRole } from '/src/utils/role.js';
 import { isDropdownOpen, setDropdownOpen } from '/src/utils/dropdown.js';
 import { getSupabaseBrowserClient } from '/src/utils/supabase.js';
 
@@ -21,10 +22,143 @@ const AUTH_CALLBACK_PARAM_KEYS = [
 ];
 const HEADER_DEFAULT_VALUE = 'N/A';
 const ROLE_FALLBACK = 'viewer';
+const ROUTE_ACCESS_BY_ROLE = {
+  admin: new Set(['dashboard', 'books', 'activities', 'users']),
+  staff: new Set(['dashboard', 'books', 'activities']),
+  viewer: new Set(['books']),
+};
 const headerAuthState = {
   client: null,
   subscription: null,
 };
+const accessState = {
+  isAuthenticated: false,
+  role: ROLE_FALLBACK,
+};
+const permissionObserverState = {
+  bound: false,
+};
+const AUTH_RELOAD_MARKER_KEY = 'valib:auth-reload-marker';
+
+function normalizeRole(role, fallback = ROLE_FALLBACK) {
+  const safe = String(role ?? '')
+    .trim()
+    .toLowerCase();
+  if (!safe) return fallback;
+  if (safe === 'admin' || safe === 'staff' || safe === 'viewer') return safe;
+  return fallback;
+}
+
+function resolveUserRole(user, fallback = ROLE_FALLBACK) {
+  return normalizeRole(
+    user?.app_metadata?.role || user?.user_metadata?.role || user?.role,
+    fallback
+  );
+}
+
+function getDefaultRouteForRole(role = ROLE_FALLBACK) {
+  const normalized = normalizeRole(role, ROLE_FALLBACK);
+  return normalized === 'viewer' ? 'books' : 'dashboard';
+}
+
+function getAllowedRoutesForRole(role = ROLE_FALLBACK) {
+  const normalized = normalizeRole(role, ROLE_FALLBACK);
+  return ROUTE_ACCESS_BY_ROLE[normalized] || ROUTE_ACCESS_BY_ROLE.viewer;
+}
+
+function getAuthorizedRoute(route) {
+  const role = accessState.isAuthenticated
+    ? normalizeRole(accessState.role, ROLE_FALLBACK)
+    : 'viewer';
+  const fallbackRoute = getDefaultRouteForRole(role);
+  if (AUTH_ROUTES.has(route)) {
+    return accessState.isAuthenticated ? fallbackRoute : route;
+  }
+
+  return getAllowedRoutesForRole(role).has(route) ? route : fallbackRoute;
+}
+
+function setAccessState({
+  isAuthenticated = false,
+  role = ROLE_FALLBACK,
+} = {}) {
+  accessState.isAuthenticated = !!isAuthenticated;
+  accessState.role = normalizeRole(role, ROLE_FALLBACK);
+
+  if (accessState.isAuthenticated) {
+    setActiveUserRole(accessState.role);
+    return;
+  }
+
+  clearActiveUserRole();
+}
+
+function applyRuleToElement(element, hide) {
+  if (!hide) return;
+  if (!(element instanceof Element)) return;
+  element.remove();
+}
+
+function applyPermissions(container = document) {
+  const role = normalizeRole(accessState.role, ROLE_FALLBACK);
+  const removeSidebarUi = role === 'viewer';
+  const canAccessUsers = role === 'admin';
+  const canAccessDashboard = role === 'admin' || role === 'staff';
+  const canAccessActivities = role === 'admin' || role === 'staff';
+  const canManageBooks = role === 'admin' || role === 'staff';
+
+  const rules = [
+    {
+      hide: removeSidebarUi,
+      selector: '#sidebar-toggle, #sidebar',
+    },
+    {
+      hide: !canAccessDashboard,
+      selector: '[data-route="dashboard"]',
+    },
+    {
+      hide: !canAccessActivities,
+      selector: '[data-route="activities"]',
+    },
+    {
+      hide: !canAccessUsers,
+      selector:
+        '[data-route="users"], #users-invite-button, #view-users button[data-action][data-user-id], #view-users thead tr > th:nth-child(5), #view-users #users-table-body tr > td:nth-child(5)',
+    },
+    {
+      hide: !canManageBooks,
+      selector:
+        '#books-add-button, #book-detail-borrower-root, #view-books button[data-action][data-book-id], #view-books thead tr > th:nth-child(6), #view-books #books-table-body tr > td:nth-child(6)',
+    },
+  ];
+
+  if (container instanceof Element) {
+    for (const rule of rules) {
+      if (!container.matches(rule.selector)) continue;
+      applyRuleToElement(container, rule.hide);
+    }
+  }
+
+  for (const rule of rules) {
+    container.querySelectorAll(rule.selector).forEach((el) => {
+      applyRuleToElement(el, rule.hide);
+    });
+  }
+}
+
+function ensurePermissionObserver() {
+  if (permissionObserverState.bound) return;
+
+  const booksView = document.getElementById('view-books');
+  if (!(booksView instanceof HTMLElement)) return;
+
+  const observer = new MutationObserver(() => {
+    applyPermissions(booksView);
+  });
+  observer.observe(booksView, { childList: true, subtree: true });
+
+  permissionObserverState.bound = true;
+}
 
 function isAppPathname(pathname = window.location.pathname) {
   return (
@@ -59,7 +193,6 @@ export function setRoute(route, { replace = false } = {}) {
 }
 
 function closeSidebar() {
-  if (window.matchMedia('(min-width: 1024px)').matches) return;
   document.getElementById('sidebar')?.classList.add('hidden');
 }
 
@@ -127,6 +260,17 @@ function getHeaderAuthClient() {
   return headerAuthState.client;
 }
 
+async function getSessionAccessToken(client) {
+  if (!client) return '';
+
+  try {
+    const { data } = await client.auth.getSession();
+    return String(data?.session?.access_token || '').trim();
+  } catch {
+    return '';
+  }
+}
+
 function setHeaderUserDropdownOpen(open) {
   const trigger = document.getElementById('header-user-trigger');
   const menu = document.getElementById('header-user-dropdown');
@@ -166,9 +310,14 @@ function setHeaderAuthUi(isAuthenticated) {
 }
 
 async function getHeaderProfile(user) {
-  if (!user?.id) return null;
+  const client = getHeaderAuthClient();
+  if (!client || !user?.id) return null;
+
+  const accessToken = await getSessionAccessToken(client);
+  if (!accessToken) return null;
+
   try {
-    return await getProfileById(user.id);
+    return await getSessionProfile(accessToken);
   } catch (error) {
     if (isProfileMissingError(error)) return null;
     throw error;
@@ -181,7 +330,7 @@ function fillHeaderUserFields(user, profile) {
   const fullName =
     profile?.full_name || user?.user_metadata?.full_name || fallbackName;
   const phone = profile?.phone || user?.user_metadata?.phone || '';
-  const role = profile?.role || user?.user_metadata?.role || ROLE_FALLBACK;
+  const role = normalizeRole(profile?.role || resolveUserRole(user));
 
   setHeaderFieldText('header-user-full-name', fullName);
   setHeaderFieldText('header-user-email', email);
@@ -192,28 +341,56 @@ function fillHeaderUserFields(user, profile) {
 async function refreshHeaderAuthUi() {
   const client = getHeaderAuthClient();
   if (!client) {
+    setAccessState({ isAuthenticated: false, role: ROLE_FALLBACK });
     setHeaderAuthUi(false);
+    applyPermissions(document);
     return;
   }
 
   try {
     const { data, error } = await client.auth.getUser();
     if (error || !data?.user) {
+      setAccessState({ isAuthenticated: false, role: ROLE_FALLBACK });
       setHeaderAuthUi(false);
+      applyPermissions(document);
       return;
     }
 
     setHeaderAuthUi(true);
+    setAccessState({
+      isAuthenticated: true,
+      role: resolveUserRole(data.user),
+    });
+
     let profile = null;
     try {
       profile = await getHeaderProfile(data.user);
     } catch (profileError) {
       console.error('Failed to load header profile', profileError);
     }
+    setAccessState({
+      isAuthenticated: true,
+      role: normalizeRole(profile?.role || resolveUserRole(data.user)),
+    });
     fillHeaderUserFields(data.user, profile);
+    applyPermissions(document);
   } catch {
+    setAccessState({ isAuthenticated: false, role: ROLE_FALLBACK });
     setHeaderAuthUi(false);
+    applyPermissions(document);
   }
+}
+
+function shouldReloadForAuthEvent(event, session) {
+  if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') return false;
+
+  const userId = String(session?.user?.id || '').trim();
+  const marker = `${event}:${userId}`;
+  const lastMarker = sessionStorage.getItem(AUTH_RELOAD_MARKER_KEY);
+  if (lastMarker === marker) return false;
+
+  sessionStorage.setItem(AUTH_RELOAD_MARKER_KEY, marker);
+  return true;
 }
 
 function subscribeToHeaderAuthState() {
@@ -222,8 +399,16 @@ function subscribeToHeaderAuthState() {
 
   headerAuthState.subscription?.unsubscribe?.();
 
-  const { data } = client.auth.onAuthStateChange(() => {
-    void refreshHeaderAuthUi();
+  const { data } = client.auth.onAuthStateChange((event, session) => {
+    if (shouldReloadForAuthEvent(event, session)) {
+      window.location.reload();
+      return;
+    }
+
+    void refreshHeaderAuthUi().then(() => {
+      if (!isAppPathname()) return;
+      void handleRouting();
+    });
   });
   headerAuthState.subscription = data?.subscription ?? null;
 }
@@ -285,15 +470,10 @@ function applyLayout(layout = 'app') {
   const sidebar = document.getElementById('sidebar');
   const content = document.getElementById('content');
   const isAuthLayout = layout === 'auth';
-  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
 
   header?.classList.toggle('hidden', isAuthLayout);
   if (sidebar) {
     if (isAuthLayout) {
-      sidebar.classList.add('hidden');
-    } else if (isDesktop) {
-      sidebar.classList.remove('hidden');
-    } else {
       sidebar.classList.add('hidden');
     }
   }
@@ -320,6 +500,7 @@ async function loadSidebar() {
   if (sidebarTemplate.trim()) {
     sidebar.innerHTML = sidebarTemplate;
   }
+  applyPermissions(sidebar);
 
   sidebar.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
@@ -337,7 +518,6 @@ async function loadSidebar() {
 
   document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
-    if (window.matchMedia('(min-width: 1024px)').matches) return;
 
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (!sidebar.contains(event.target) && !toggleBtn?.contains(event.target)) {
@@ -357,6 +537,7 @@ function setupRouteLinkDelegation() {
     if (!route) return;
 
     event.preventDefault();
+    closeSidebar();
     setRoute(route);
     void handleRouting();
   });
@@ -367,7 +548,6 @@ async function loadHeader() {
   if (!header) return;
 
   header.innerHTML = headerTemplate;
-
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
     document.getElementById('sidebar')?.classList.toggle('hidden');
   });
@@ -378,7 +558,13 @@ async function loadHeader() {
 }
 
 export async function handleRouting() {
-  const { route } = getRouteInfo();
+  const { route: requestedRoute } = getRouteInfo();
+  const route = getAuthorizedRoute(requestedRoute);
+  if (route !== requestedRoute) {
+    setRoute(route, { replace: true });
+    return handleRouting();
+  }
+
   const config = ROUTE_CONFIG[route];
   if (!config) return;
 
@@ -387,6 +573,7 @@ export async function handleRouting() {
   }
 
   applyLayout(config.layout || 'app');
+  closeSidebar();
 
   document.querySelectorAll('.page-view').forEach((view) => {
     view.classList.add('hidden');
@@ -397,6 +584,7 @@ export async function handleRouting() {
 
   targetView.classList.remove('hidden');
   highlightActiveTabLink(route);
+  applyPermissions(document);
 
   if (INITIALIZED_VIEWS.has(route)) return;
 
@@ -408,11 +596,14 @@ export async function handleRouting() {
     await config.loader();
   }
 
+  applyPermissions(targetView);
   INITIALIZED_VIEWS.add(route);
 }
 
 async function bootstrapApp() {
-  await Promise.all([loadHeader(), loadSidebar()]);
+  await loadHeader();
+  await loadSidebar();
+  ensurePermissionObserver();
   setupRouteLinkDelegation();
 
   if (!isAppPathname()) {
@@ -420,6 +611,7 @@ async function bootstrapApp() {
   }
 
   await handleRouting();
+  applyPermissions(document);
 }
 
 window.addEventListener('popstate', () => {

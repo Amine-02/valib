@@ -6,16 +6,16 @@ import {
   getProfilesCountHandler,
   getProfilesHandler,
   inviteProfileHandler,
-  purgeUnauthorizedSelfHandler,
   updateProfileHandler,
 } from '../controllers/profilesController.js';
+import { requireRoles } from '../middlewares/access.js';
 
 const router = Router();
+router.use(requireRoles('admin'));
 
 router.get('/', getProfilesHandler);
 router.get('/count', getProfilesCountHandler);
 router.post('/invite', inviteProfileHandler);
-router.post('/purge-unauthorized-self', purgeUnauthorizedSelfHandler);
 router.get('/:id', getProfileByIdHandler);
 router.post('/', createProfileHandler);
 router.patch('/:id', updateProfileHandler);

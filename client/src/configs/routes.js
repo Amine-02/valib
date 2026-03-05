@@ -26,7 +26,7 @@ export const ROUTE_CONFIG = {
     layout: 'app',
   },
 
-  activties: {
+  activities: {
     viewId: 'view-activities',
     template: activitiesTemplate,
     loader: setupActivities,

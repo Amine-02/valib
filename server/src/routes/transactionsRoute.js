@@ -6,8 +6,10 @@ import {
   getTransactionsHandler,
   getOverdueBooksHandler,
 } from '../controllers/transactionsController.js';
+import { requireRoles } from '../middlewares/access.js';
 
 const router = Router();
+router.use(requireRoles('admin', 'staff'));
 
 router.get('/', getTransactionsHandler);
 router.get('/count', getTransactionsCountHandler);
