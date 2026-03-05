@@ -3,5 +3,6 @@ export const appState = {
   isAuthenticated: false,
   role: 'viewer',
   onboardingRequired: false,
+  onboardingChecked: false,
   overdueBookIds: [],
 };

@@ -38,6 +38,7 @@ const permissionObserverState = {
   bound: false,
 };
 const AUTH_RELOAD_MARKER_KEY = 'valib:auth-reload-marker';
+const PROFILE_LOOKUP_PENDING = Symbol('profile_lookup_pending');
 
 function normalizeRole(role, fallback = ROLE_FALLBACK) {
   const safe = String(role ?? '')
@@ -76,7 +77,7 @@ function getAuthorizedRoute(route) {
     return getAllowedRoutesForRole(role).has(route) ? route : fallbackRoute;
   }
 
-  if (appState.onboardingRequired) {
+  if (appState.onboardingChecked && appState.onboardingRequired) {
     return 'sign-up';
   }
 
@@ -91,10 +92,12 @@ function setAccessState({
   isAuthenticated = false,
   role = ROLE_FALLBACK,
   onboardingRequired = false,
+  onboardingChecked = false,
 } = {}) {
   appState.isAuthenticated = !!isAuthenticated;
   appState.role = normalizeRole(role, ROLE_FALLBACK);
   appState.onboardingRequired = !!onboardingRequired;
+  appState.onboardingChecked = !!onboardingChecked;
 
   if (appState.isAuthenticated) {
     setActiveUserRole(appState.role);
@@ -365,10 +368,10 @@ function isProfileSetupComplete(profile) {
 
 async function getHeaderProfile(user) {
   const client = getHeaderAuthClient();
-  if (!client || !user?.id) return null;
+  if (!client || !user?.id) return PROFILE_LOOKUP_PENDING;
 
   const accessToken = await getSessionAccessToken(client);
-  if (!accessToken) return null;
+  if (!accessToken) return PROFILE_LOOKUP_PENDING;
 
   try {
     return await getSessionProfile(accessToken);
@@ -399,6 +402,7 @@ async function refreshHeaderAuthUi() {
       isAuthenticated: false,
       role: ROLE_FALLBACK,
       onboardingRequired: false,
+      onboardingChecked: false,
     });
     setOverdueBookIds([]);
     setHeaderAuthUi(false);
@@ -413,6 +417,7 @@ async function refreshHeaderAuthUi() {
         isAuthenticated: false,
         role: ROLE_FALLBACK,
         onboardingRequired: false,
+        onboardingChecked: false,
       });
       setOverdueBookIds([]);
       setHeaderAuthUi(false);
@@ -424,28 +429,38 @@ async function refreshHeaderAuthUi() {
     setAccessState({
       isAuthenticated: true,
       role: resolveUserRole(data.user),
-      onboardingRequired: true,
+      onboardingRequired: false,
+      onboardingChecked: false,
     });
 
     let profile = null;
+    let onboardingChecked = false;
     try {
       profile = await getHeaderProfile(data.user);
+      onboardingChecked = profile !== PROFILE_LOOKUP_PENDING;
     } catch (profileError) {
       console.error('Failed to load header profile', profileError);
+      profile = PROFILE_LOOKUP_PENDING;
+      onboardingChecked = false;
     }
+
+    const resolvedProfile = profile === PROFILE_LOOKUP_PENDING ? null : profile;
     setAccessState({
       isAuthenticated: true,
-      role: normalizeRole(profile?.role || resolveUserRole(data.user)),
-      onboardingRequired: !isProfileSetupComplete(profile),
+      role: normalizeRole(resolvedProfile?.role || resolveUserRole(data.user)),
+      onboardingRequired:
+        onboardingChecked && !isProfileSetupComplete(resolvedProfile),
+      onboardingChecked,
     });
     await refreshOverdueBookIds(appState.role);
-    fillHeaderUserFields(data.user, profile);
+    fillHeaderUserFields(data.user, resolvedProfile);
     applyPermissions(document);
   } catch {
     setAccessState({
       isAuthenticated: false,
       role: ROLE_FALLBACK,
       onboardingRequired: false,
+      onboardingChecked: false,
     });
     setOverdueBookIds([]);
     setHeaderAuthUi(false);
