@@ -184,6 +184,18 @@ function isProfileMissingError(error) {
   );
 }
 
+function isDuplicateProfileError(error) {
+  const message = String(error?.message || '')
+    .trim()
+    .toLowerCase();
+  return (
+    message.includes('duplicate key') ||
+    message.includes('unique constraint') ||
+    message.includes('already exists') ||
+    message.includes('request failed (409)')
+  );
+}
+
 async function userHasProfile(userId) {
   try {
     await getProfileById(userId);
@@ -274,8 +286,15 @@ async function upsertProfileFromSignup({
   try {
     await updateProfile(userId, payload);
     return;
-  } catch {
+  } catch (updateError) {
+    if (!isProfileMissingError(updateError)) throw updateError;
+  }
+
+  try {
     await createProfile(payload);
+  } catch (createError) {
+    if (!isDuplicateProfileError(createError)) throw createError;
+    await updateProfile(userId, payload);
   }
 }
 
