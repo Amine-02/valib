@@ -13,6 +13,7 @@ import {
 import { getById, queryAll } from '/src/utils/dom.js';
 import { normalizeLowerTrim } from '/src/utils/filter.js';
 import { clearLoaderState, showCenteredLoader } from '/src/utils/loader.js';
+import { formatPhoneNumber, getPhoneDigits } from '/src/utils/phone.js';
 import { toTitleCase } from '/src/utils/string.js';
 
 const IDS = {
@@ -116,23 +117,6 @@ function normalizePublishedYearInput(value, { required = false } = {}) {
   }
 
   return parsed;
-}
-
-function getPhoneDigits(value) {
-  return String(value ?? '')
-    .replace(/\D+/g, '')
-    .slice(0, 10);
-}
-
-function formatPhoneNumber(value) {
-  const digits = getPhoneDigits(value);
-  if (!digits) return '';
-  if (digits.length < 4) return `(${digits}`;
-  if (digits.length < 7) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  }
-
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }
 
 function bindOnce(element, eventName, handler) {

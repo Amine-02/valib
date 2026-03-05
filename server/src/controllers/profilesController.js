@@ -44,10 +44,7 @@ function validateRoleForBody(req, res) {
   return false;
 }
 
-function buildInviteRedirectTo(req) {
-  const fromBody = String(req.body?.redirect_to || '').trim();
-  if (fromBody) return fromBody;
-
+function buildInviteRedirectTo() {
   const appUrl = String(process.env.APP_URL || '')
     .trim()
     .replace(/\/+$/, '');
@@ -167,7 +164,7 @@ export async function inviteProfileHandler(req, res) {
     const { user, profile } = await inviteProfileByEmail({
       email,
       role,
-      redirectTo: buildInviteRedirectTo(req),
+      redirectTo: buildInviteRedirectTo(),
     });
 
     res.status(201).json({

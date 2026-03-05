@@ -1,9 +1,19 @@
-import { createProfile, updateProfile } from '/src/services/profilesService.js';
+import {
+  createProfile,
+  getProfileById,
+  updateProfile,
+} from '/src/services/profilesService.js';
+import { formatPhoneNumber } from '/src/utils/phone.js';
 import { getSupabaseBrowserClient } from '/src/utils/supabase.js';
 
 const ROLE_FALLBACK = 'viewer';
 const REDIRECT_AFTER_SIGN_IN = '/app';
-const REDIRECT_AFTER_SIGN_UP = '/app/sign-in';
+const REDIRECT_AFTER_SIGN_UP = '/app';
+const OAUTH_REDIRECT_SIGN_IN = '/app/sign-in';
+const OAUTH_REDIRECT_SIGN_UP = '/app/sign-up';
+const GOOGLE_PROVIDER = 'google';
+const INVITE_REQUIRED_MESSAGE =
+  'This account is not invited yet. Ask an admin to send an invite.';
 
 function getById(id) {
   return document.getElementById(id);
@@ -31,8 +41,23 @@ function setDisabled(el, disabled) {
   el.classList.toggle('opacity-60', !!disabled);
 }
 
-function normalizePhone(value) {
-  return String(value || '').trim();
+function getRedirectUrl(path) {
+  return `${window.location.origin}${path}`;
+}
+
+function hasProviderIdentity(user, provider) {
+  const safeProvider = String(provider || '')
+    .trim()
+    .toLowerCase();
+  if (!safeProvider) return false;
+
+  const identities = Array.isArray(user?.identities) ? user.identities : [];
+  return identities.some((identity) => {
+    const currentProvider = String(identity?.provider || '')
+      .trim()
+      .toLowerCase();
+    return currentProvider === safeProvider;
+  });
 }
 
 function normalizeRole(role) {
@@ -42,7 +67,7 @@ function normalizeRole(role) {
   return safe || ROLE_FALLBACK;
 }
 
-function getInviteTokenFromUrl() {
+function getAuthTokenFromUrl() {
   const query = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
 
@@ -63,6 +88,18 @@ function getInviteTokenFromUrl() {
   return { tokenHash, type, code, accessToken, refreshToken };
 }
 
+function getAuthErrorFromUrl() {
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+  const errorDescription = String(
+    query.get('error_description') || hash.get('error_description') || ''
+  ).trim();
+  if (errorDescription) return errorDescription;
+
+  return String(query.get('error') || hash.get('error') || '').trim();
+}
+
 function stripAuthTokenQueryParams() {
   const url = new URL(window.location.href);
   let changed = false;
@@ -71,6 +108,9 @@ function stripAuthTokenQueryParams() {
     'token_hash',
     'type',
     'next',
+    'code',
+    'access_token',
+    'refresh_token',
     'error',
     'error_code',
     'error_description',
@@ -110,23 +150,45 @@ function isAuthSessionMissingError(error) {
   return message.includes('auth session missing');
 }
 
-async function getInviteSessionUser(client) {
+function isProfileMissingError(error) {
+  const message = String(error?.message || '')
+    .trim()
+    .toLowerCase();
+  return (
+    message.includes('profile not found') ||
+    message.includes('request failed (404)')
+  );
+}
+
+async function userHasProfile(userId) {
+  try {
+    await getProfileById(userId);
+    return true;
+  } catch (error) {
+    if (isProfileMissingError(error)) return false;
+    throw error;
+  }
+}
+
+async function getAuthSessionUser(
+  client,
+  { allowOtp = false, otpFallbackType = 'invite' } = {}
+) {
   const { tokenHash, type, code, accessToken, refreshToken } =
-    getInviteTokenFromUrl();
+    getAuthTokenFromUrl();
+  const hasAuthParams = !!(tokenHash || code || accessToken || refreshToken);
 
   const { data: existingSession } = await client.auth.getSession();
-  if (existingSession?.session?.user) {
-    return existingSession.session.user;
-  }
+  const hasExistingSessionUser = !!existingSession?.session?.user;
 
-  if (code) {
+  if (!hasExistingSessionUser && code) {
     const { error } = await client.auth.exchangeCodeForSession(code);
     if (error && !isAuthSessionMissingError(error)) {
       throw error;
     }
   }
 
-  if (accessToken && refreshToken) {
+  if (!hasExistingSessionUser && accessToken && refreshToken) {
     const { error } = await client.auth.setSession({
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -136,29 +198,38 @@ async function getInviteSessionUser(client) {
     }
   }
 
-  if (tokenHash) {
+  if (!hasExistingSessionUser && allowOtp && tokenHash) {
     const otpType = ['invite', 'signup', 'email'].includes(type)
       ? type
-      : 'invite';
-    const { data, error } = await client.auth.verifyOtp({
+      : otpFallbackType;
+    const { error } = await client.auth.verifyOtp({
       token_hash: tokenHash,
       type: otpType,
     });
 
     if (error && !isAuthSessionMissingError(error)) throw error;
-    if (data?.user) {
-      stripAuthTokenQueryParams();
-      return data.user;
-    }
   }
 
   const { data, error } = await client.auth.getUser();
   if (error && !isAuthSessionMissingError(error)) throw error;
   if (data?.user) {
-    stripAuthTokenQueryParams();
+    if (hasAuthParams) stripAuthTokenQueryParams();
     return data.user;
   }
-  return null;
+
+  if (hasAuthParams) stripAuthTokenQueryParams();
+  return hasExistingSessionUser ? existingSession.session.user : null;
+}
+
+async function enforceInvitedAccount(client, user, feedbackEl) {
+  if (!user?.id) return false;
+
+  const hasProfile = await userHasProfile(user.id);
+  if (hasProfile) return true;
+
+  await client.auth.signOut();
+  setMessage(feedbackEl, INVITE_REQUIRED_MESSAGE);
+  return false;
 }
 
 async function upsertProfileFromSignup({
@@ -184,7 +255,7 @@ async function upsertProfileFromSignup({
   }
 }
 
-export function bindSignInForm() {
+export async function bindSignInForm() {
   const form = getById('sign-in-form');
   if (!(form instanceof HTMLFormElement) || form.dataset.bound === 'true') {
     return;
@@ -193,7 +264,34 @@ export function bindSignInForm() {
   const emailInput = getById('sign-in-email');
   const passwordInput = getById('sign-in-password');
   const submitButton = getById('sign-in-submit');
+  const googleButton = getById('sign-in-google');
   const feedback = getById('sign-in-feedback');
+  const client = getSupabaseBrowserClient();
+
+  if (googleButton instanceof HTMLButtonElement) {
+    googleButton.addEventListener('click', async () => {
+      setMessage(feedback, '');
+      setDisabled(submitButton, true);
+      setDisabled(googleButton, true);
+
+      try {
+        const { error } = await client.auth.signInWithOAuth({
+          provider: GOOGLE_PROVIDER,
+          options: {
+            redirectTo: getRedirectUrl(OAUTH_REDIRECT_SIGN_IN),
+          },
+        });
+        if (error) throw error;
+      } catch (error) {
+        setMessage(
+          feedback,
+          error?.message || 'Failed to start Google sign-in. Please try again.'
+        );
+        setDisabled(submitButton, false);
+        setDisabled(googleButton, false);
+      }
+    });
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -210,14 +308,20 @@ export function bindSignInForm() {
     }
 
     setDisabled(submitButton, true);
+    setDisabled(googleButton, true);
 
     try {
-      const client = getSupabaseBrowserClient();
       const { error } = await client.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
+
+      const { data: authData, error: userError } = await client.auth.getUser();
+      if (userError) throw userError;
+      if (!(await enforceInvitedAccount(client, authData?.user, feedback))) {
+        return;
+      }
 
       setMessage(feedback, 'Signed in successfully.', 'success');
       window.location.assign(REDIRECT_AFTER_SIGN_IN);
@@ -228,10 +332,38 @@ export function bindSignInForm() {
       );
     } finally {
       setDisabled(submitButton, false);
+      setDisabled(googleButton, false);
     }
   });
 
   form.dataset.bound = 'true';
+
+  const authError = getAuthErrorFromUrl();
+  if (authError) {
+    setMessage(feedback, authError);
+    stripAuthTokenQueryParams();
+  }
+
+  setDisabled(submitButton, true);
+  setDisabled(googleButton, true);
+  try {
+    const user = await getAuthSessionUser(client);
+    if (!user?.id) return;
+    if (!(await enforceInvitedAccount(client, user, feedback))) {
+      return;
+    }
+
+    setMessage(feedback, 'Signed in successfully.', 'success');
+    window.location.assign(REDIRECT_AFTER_SIGN_IN);
+  } catch (error) {
+    setMessage(
+      feedback,
+      error?.message || 'Failed to restore your sign-in session.'
+    );
+  } finally {
+    setDisabled(submitButton, false);
+    setDisabled(googleButton, false);
+  }
 }
 
 export async function bindSignUpForm() {
@@ -246,14 +378,88 @@ export async function bindSignUpForm() {
   const fullNameInput = getById('sign-up-full-name');
   const phoneInput = getById('sign-up-phone');
   const submitButton = getById('sign-up-submit');
+  const googleLinkButton = getById('sign-up-google-link');
+  const subtitle = getById('sign-up-subtitle');
   const feedback = getById('sign-up-feedback');
+  const defaultSubtitle = String(subtitle?.textContent || '').trim();
+  const client = getSupabaseBrowserClient();
+
+  if (phoneInput instanceof HTMLInputElement) {
+    phoneInput.addEventListener('input', () => {
+      phoneInput.value = formatPhoneNumber(phoneInput.value);
+    });
+  }
 
   let inviteUser = null;
   let invitedRole = ROLE_FALLBACK;
 
+  function syncGoogleSignupState() {
+    const inviteReady = !!inviteUser?.id && !!inviteUser?.email;
+    const googleLinked = hasProviderIdentity(inviteUser, GOOGLE_PROVIDER);
+
+    if (subtitle instanceof HTMLElement) {
+      subtitle.textContent = googleLinked
+        ? 'Google is linked for this invite. You can finish profile with or without password.'
+        : defaultSubtitle;
+    }
+
+    if (googleLinkButton instanceof HTMLButtonElement) {
+      googleLinkButton.textContent = googleLinked
+        ? 'Google account linked'
+        : 'Link Google account';
+      setDisabled(googleLinkButton, !inviteReady || googleLinked);
+    }
+
+    return { inviteReady, googleLinked };
+  }
+
+  if (googleLinkButton instanceof HTMLButtonElement) {
+    googleLinkButton.addEventListener('click', async () => {
+      setMessage(feedback, '');
+
+      const { inviteReady, googleLinked } = syncGoogleSignupState();
+      if (!inviteReady) {
+        setMessage(feedback, 'Invite link is missing or invalid.');
+        return;
+      }
+      if (googleLinked) {
+        setMessage(feedback, 'Google account is already linked.', 'success');
+        return;
+      }
+
+      setDisabled(submitButton, true);
+      setDisabled(googleLinkButton, true);
+
+      try {
+        const { error } = await client.auth.linkIdentity({
+          provider: GOOGLE_PROVIDER,
+          options: {
+            redirectTo: getRedirectUrl(OAUTH_REDIRECT_SIGN_UP),
+          },
+        });
+        if (error) throw error;
+      } catch (error) {
+        setMessage(
+          feedback,
+          error?.message || 'Failed to start Google account linking.'
+        );
+        setDisabled(submitButton, false);
+        syncGoogleSignupState();
+      }
+    });
+  }
+
+  const authError = getAuthErrorFromUrl();
+  if (authError) {
+    setMessage(feedback, authError);
+    stripAuthTokenQueryParams();
+  }
+
   try {
-    const client = getSupabaseBrowserClient();
-    inviteUser = await getInviteSessionUser(client);
+    inviteUser = await getAuthSessionUser(client, {
+      allowOtp: true,
+      otpFallbackType: 'invite',
+    });
 
     if (!inviteUser?.id || !inviteUser?.email) {
       setMessage(
@@ -268,6 +474,7 @@ export async function bindSignUpForm() {
         emailInput.readOnly = true;
         emailInput.classList.add('bg-surface-muted');
       }
+      setDisabled(submitButton, false);
     }
   } catch (error) {
     const message = isAuthSessionMissingError(error)
@@ -275,13 +482,16 @@ export async function bindSignUpForm() {
       : error?.message || 'Unable to validate invite link. Try again.';
     setMessage(feedback, message);
     setDisabled(submitButton, true);
+  } finally {
+    syncGoogleSignupState();
   }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setMessage(feedback, '');
 
-    if (!inviteUser?.id || !inviteUser?.email) {
+    const { inviteReady, googleLinked } = syncGoogleSignupState();
+    if (!inviteReady) {
       setMessage(feedback, 'Invite link is missing or invalid.');
       return;
     }
@@ -291,10 +501,14 @@ export async function bindSignUpForm() {
       .toLowerCase();
     const password = String(passwordInput?.value || '');
     const passwordConfirm = String(confirmInput?.value || '');
+    const hasPasswordInput = !!(password || passwordConfirm);
     const fullName = String(fullNameInput?.value || '').trim();
-    const phone = normalizePhone(phoneInput?.value);
+    const phone = formatPhoneNumber(phoneInput?.value);
+    if (phoneInput instanceof HTMLInputElement && phoneInput.value !== phone) {
+      phoneInput.value = phone;
+    }
 
-    if (!email || !password || !passwordConfirm || !fullName || !phone) {
+    if (!email || !fullName || !phone) {
       setMessage(feedback, 'All fields are required.');
       return;
     }
@@ -304,29 +518,41 @@ export async function bindSignUpForm() {
       return;
     }
 
-    if (password !== passwordConfirm) {
+    if (!googleLinked && !hasPasswordInput) {
+      setMessage(
+        feedback,
+        'Set a password or link your Google account before continuing.'
+      );
+      return;
+    }
+
+    if (hasPasswordInput && password !== passwordConfirm) {
       setMessage(feedback, 'Passwords do not match.');
       return;
     }
 
-    if (password.length < 6) {
+    if (hasPasswordInput && password.length < 6) {
       setMessage(feedback, 'Password must be at least 6 characters.');
       return;
     }
 
     setDisabled(submitButton, true);
+    setDisabled(googleLinkButton, true);
 
     try {
-      const client = getSupabaseBrowserClient();
-
-      const { error: updateAuthError } = await client.auth.updateUser({
-        password,
+      const updateUserPayload = {
         data: {
           full_name: fullName,
           phone,
           role: invitedRole,
         },
-      });
+      };
+      if (hasPasswordInput) {
+        updateUserPayload.password = password;
+      }
+
+      const { error: updateAuthError } =
+        await client.auth.updateUser(updateUserPayload);
       if (updateAuthError) throw updateAuthError;
 
       await upsertProfileFromSignup({
@@ -337,13 +563,7 @@ export async function bindSignUpForm() {
         role: invitedRole,
       });
 
-      await client.auth.signOut();
-
-      setMessage(
-        feedback,
-        'Account setup complete. Redirecting to sign in...',
-        'success'
-      );
+      setMessage(feedback, 'Account setup complete. Redirecting...', 'success');
       window.setTimeout(() => {
         window.location.assign(REDIRECT_AFTER_SIGN_UP);
       }, 700);
@@ -353,6 +573,7 @@ export async function bindSignUpForm() {
         error?.message || 'Failed to complete signup. Please try again.'
       );
       setDisabled(submitButton, false);
+      syncGoogleSignupState();
     }
   });
 
