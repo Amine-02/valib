@@ -418,6 +418,8 @@ export async function bindSignUpForm() {
   const emailInput = getById('sign-up-email');
   const passwordInput = getById('sign-up-password');
   const confirmInput = getById('sign-up-password-confirm');
+  const passwordField = getById('sign-up-password-field');
+  const passwordConfirmField = getById('sign-up-password-confirm-field');
   const fullNameInput = getById('sign-up-full-name');
   const phoneInput = getById('sign-up-phone');
   const submitButton = getById('sign-up-submit');
@@ -439,11 +441,38 @@ export async function bindSignUpForm() {
   function syncGoogleSignupState() {
     const inviteReady = !!inviteUser?.id && !!inviteUser?.email;
     const googleLinked = hasProviderIdentity(inviteUser, GOOGLE_PROVIDER);
+    const hidePasswordInputs = googleLinked;
 
     if (subtitle instanceof HTMLElement) {
       subtitle.textContent = googleLinked
         ? 'Google is linked for this invite. You can finish profile with or without password.'
         : defaultSubtitle;
+    }
+
+    if (passwordField instanceof HTMLElement) {
+      passwordField.classList.toggle('hidden', hidePasswordInputs);
+      passwordField.setAttribute(
+        'aria-hidden',
+        hidePasswordInputs ? 'true' : 'false'
+      );
+    }
+
+    if (passwordConfirmField instanceof HTMLElement) {
+      passwordConfirmField.classList.toggle('hidden', hidePasswordInputs);
+      passwordConfirmField.setAttribute(
+        'aria-hidden',
+        hidePasswordInputs ? 'true' : 'false'
+      );
+    }
+
+    if (passwordInput instanceof HTMLInputElement) {
+      if (hidePasswordInputs) passwordInput.value = '';
+      setDisabled(passwordInput, hidePasswordInputs);
+    }
+
+    if (confirmInput instanceof HTMLInputElement) {
+      if (hidePasswordInputs) confirmInput.value = '';
+      setDisabled(confirmInput, hidePasswordInputs);
     }
 
     if (googleLinkButton instanceof HTMLButtonElement) {
