@@ -11,14 +11,13 @@ import {
 import { requireRoles } from '../middlewares/access.js';
 
 const router = Router();
-router.use(requireRoles('admin'));
 
-router.get('/', getProfilesHandler);
-router.get('/count', getProfilesCountHandler);
-router.post('/invite', inviteProfileHandler);
-router.get('/:id', getProfileByIdHandler);
-router.post('/', createProfileHandler);
-router.patch('/:id', updateProfileHandler);
-router.delete('/:id', deleteProfileHandler);
+router.get('/count', requireRoles('admin', 'staff'), getProfilesCountHandler);
+router.get('/', requireRoles('admin'), getProfilesHandler);
+router.post('/invite', requireRoles('admin'), inviteProfileHandler);
+router.get('/:id', requireRoles('admin'), getProfileByIdHandler);
+router.post('/', requireRoles('admin'), createProfileHandler);
+router.patch('/:id', requireRoles('admin'), updateProfileHandler);
+router.delete('/:id', requireRoles('admin'), deleteProfileHandler);
 
 export default router;
