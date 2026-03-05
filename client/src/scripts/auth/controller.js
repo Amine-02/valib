@@ -52,12 +52,36 @@ function hasProviderIdentity(user, provider) {
   if (!safeProvider) return false;
 
   const identities = Array.isArray(user?.identities) ? user.identities : [];
-  return identities.some((identity) => {
-    const currentProvider = String(identity?.provider || '')
+  if (
+    identities.some(
+      (identity) =>
+        String(identity?.provider || '')
+          .trim()
+          .toLowerCase() === safeProvider
+    )
+  ) {
+    return true;
+  }
+
+  const metadataProviders = Array.isArray(user?.app_metadata?.providers)
+    ? user.app_metadata.providers
+    : [];
+  if (
+    metadataProviders.some(
+      (currentProvider) =>
+        String(currentProvider || '')
+          .trim()
+          .toLowerCase() === safeProvider
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    String(user?.app_metadata?.provider || '')
       .trim()
-      .toLowerCase();
-    return currentProvider === safeProvider;
-  });
+      .toLowerCase() === safeProvider
+  );
 }
 
 function normalizeRole(role) {

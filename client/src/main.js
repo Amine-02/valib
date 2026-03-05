@@ -7,6 +7,18 @@ import { getSupabaseBrowserClient } from '/src/utils/supabase.js';
 
 const BASE_PREFIX = 'app';
 const INITIALIZED_VIEWS = new Set();
+const AUTH_ROUTES = new Set(['sign-in', 'sign-up']);
+const AUTH_CALLBACK_PARAM_KEYS = [
+  'token_hash',
+  'type',
+  'next',
+  'code',
+  'access_token',
+  'refresh_token',
+  'error',
+  'error_code',
+  'error_description',
+];
 const HEADER_DEFAULT_VALUE = 'N/A';
 const ROLE_FALLBACK = 'viewer';
 const headerAuthState = {
@@ -49,6 +61,29 @@ export function setRoute(route, { replace = false } = {}) {
 function closeSidebar() {
   if (window.matchMedia('(min-width: 1024px)').matches) return;
   document.getElementById('sidebar')?.classList.add('hidden');
+}
+
+function stripAuthCallbackUrlParams() {
+  const url = new URL(window.location.href);
+  let changed = false;
+
+  AUTH_CALLBACK_PARAM_KEYS.forEach((key) => {
+    if (!url.searchParams.has(key)) return;
+    url.searchParams.delete(key);
+    changed = true;
+  });
+
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+  AUTH_CALLBACK_PARAM_KEYS.forEach((key) => {
+    if (!hashParams.has(key)) return;
+    hashParams.delete(key);
+    changed = true;
+  });
+
+  url.hash = hashParams.toString();
+  if (!changed) return;
+
+  history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function getHeaderField(id) {
@@ -113,8 +148,16 @@ function resetHeaderUserFields() {
 function setHeaderAuthUi(isAuthenticated) {
   const authLink = document.getElementById('auth-link');
   const userRoot = document.getElementById('header-user-root');
-  authLink?.classList.toggle('hidden', isAuthenticated);
-  userRoot?.classList.toggle('hidden', !isAuthenticated);
+
+  if (authLink instanceof HTMLElement) {
+    authLink.hidden = isAuthenticated;
+    authLink.classList.toggle('hidden', isAuthenticated);
+  }
+
+  if (userRoot instanceof HTMLElement) {
+    userRoot.hidden = !isAuthenticated;
+    userRoot.classList.toggle('hidden', !isAuthenticated);
+  }
 
   if (!isAuthenticated) {
     resetHeaderUserFields();
@@ -208,7 +251,7 @@ function bindHeaderAuthControls() {
         try {
           await client.auth.signOut();
           closeHeaderUserDropdown();
-          setRoute('sign-in');
+          setRoute('dashboard', { replace: true });
           await handleRouting();
         } finally {
           logoutButton.disabled = false;
@@ -338,6 +381,11 @@ export async function handleRouting() {
   const { route } = getRouteInfo();
   const config = ROUTE_CONFIG[route];
   if (!config) return;
+
+  if (!AUTH_ROUTES.has(route)) {
+    stripAuthCallbackUrlParams();
+  }
+
   applyLayout(config.layout || 'app');
 
   document.querySelectorAll('.page-view').forEach((view) => {

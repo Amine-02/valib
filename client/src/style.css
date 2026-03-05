@@ -76,6 +76,13 @@
   --color-border: var(--color-border);
   --color-border-strong: var(--color-border-strong);
 
+  --color-success-bg: var(--color-success-bg);
+  --color-success-text: var(--color-success-text);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-warning-text: var(--color-warning-text);
+  --color-danger-bg: var(--color-danger-bg);
+  --color-danger-text: var(--color-danger-text);
+
   --radius-card: var(--radius-lg);
   --radius-panel: var(--radius-xl);
 }
