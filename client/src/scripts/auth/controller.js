@@ -184,6 +184,30 @@ function isProfileMissingError(error) {
   );
 }
 
+function isProfileSetupComplete(profile) {
+  const fullName = String(profile?.full_name || '').trim();
+  const phone = String(profile?.phone || '').trim();
+  return !!(fullName && phone);
+}
+
+function isTransientNetworkError(error) {
+  const message = String(error?.message || '')
+    .trim()
+    .toLowerCase();
+
+  if (!message) return false;
+
+  return (
+    message.includes('network error') ||
+    message.includes('networkerror') ||
+    message.includes('failed to fetch') ||
+    message.includes('load failed') ||
+    message.includes('request aborted') ||
+    message.includes('aborterror') ||
+    message.includes('signal is aborted')
+  );
+}
+
 async function getSessionAccessToken(client) {
   if (!client) return '';
 
@@ -192,6 +216,39 @@ async function getSessionAccessToken(client) {
     return String(data?.session?.access_token || '').trim();
   } catch {
     return '';
+  }
+}
+
+async function tryRecoverSignedInRedirect(client, feedbackEl) {
+  try {
+    const { data, error } = await client.auth.getUser();
+    if (error || !data?.user) return false;
+
+    if (!(await enforceInvitedAccount(client, data.user, feedbackEl))) {
+      return true;
+    }
+
+    setMessage(feedbackEl, 'Signed in successfully.', 'success');
+    window.location.assign(REDIRECT_AFTER_SIGN_IN);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function tryRecoverSignUpRedirect(client, feedbackEl) {
+  const accessToken = await getSessionAccessToken(client);
+  if (!accessToken) return false;
+
+  try {
+    const profile = await getSessionProfile(accessToken);
+    if (!isProfileSetupComplete(profile)) return false;
+
+    setMessage(feedbackEl, 'Account setup complete. Redirecting...', 'success');
+    window.location.assign(REDIRECT_AFTER_SIGN_UP);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -347,6 +404,13 @@ export async function bindSignInForm() {
       setMessage(feedback, 'Signed in successfully.', 'success');
       window.location.assign(REDIRECT_AFTER_SIGN_IN);
     } catch (error) {
+      if (
+        isTransientNetworkError(error) &&
+        (await tryRecoverSignedInRedirect(client, feedback))
+      ) {
+        return;
+      }
+
       setMessage(
         feedback,
         error?.message || 'Failed to sign in. Please try again.'
@@ -377,6 +441,13 @@ export async function bindSignInForm() {
     setMessage(feedback, 'Signed in successfully.', 'success');
     window.location.assign(REDIRECT_AFTER_SIGN_IN);
   } catch (error) {
+    if (
+      isTransientNetworkError(error) &&
+      (await tryRecoverSignedInRedirect(client, feedback))
+    ) {
+      return;
+    }
+
     setMessage(
       feedback,
       error?.message || 'Failed to restore your sign-in session.'
@@ -620,6 +691,13 @@ export async function bindSignUpForm() {
         window.location.assign(REDIRECT_AFTER_SIGN_UP);
       }, 700);
     } catch (error) {
+      if (
+        isTransientNetworkError(error) &&
+        (await tryRecoverSignUpRedirect(client, feedback))
+      ) {
+        return;
+      }
+
       setMessage(
         feedback,
         error?.message || 'Failed to complete signup. Please try again.'
