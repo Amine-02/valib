@@ -2,6 +2,7 @@ import sidebarTemplate from '/src/components/sidebar.html?raw';
 import headerTemplate from '/src/components/header.html?raw';
 import { ROUTE_CONFIG } from '/src/configs/routes.js';
 import { getSessionProfile } from '/src/services/authService.js';
+import { getOverdueBooks } from '/src/services/transactionsService.js';
 import { appState } from '/src/state.js';
 import { clearActiveUserRole, setActiveUserRole } from '/src/utils/role.js';
 import { isDropdownOpen, setDropdownOpen } from '/src/utils/dropdown.js';
@@ -23,6 +24,7 @@ const AUTH_CALLBACK_PARAM_KEYS = [
 ];
 const HEADER_DEFAULT_VALUE = 'N/A';
 const ROLE_FALLBACK = 'viewer';
+const OVERDUE_ACCESS_ROLES = new Set(['admin', 'staff']);
 const ROUTE_ACCESS_BY_ROLE = {
   admin: new Set(['dashboard', 'books', 'activities', 'users']),
   staff: new Set(['dashboard', 'books', 'activities']),
@@ -102,6 +104,43 @@ function setAccessState({
   clearActiveUserRole();
 }
 
+function setOverdueBookIds(bookIds = []) {
+  if (!Array.isArray(bookIds)) {
+    appState.overdueBookIds = [];
+    return;
+  }
+
+  const uniqueIds = [
+    ...new Set(
+      bookIds.map((bookId) => String(bookId || '').trim()).filter(Boolean)
+    ),
+  ];
+  appState.overdueBookIds = uniqueIds;
+}
+
+function hasOverdueBooksAccess(role = ROLE_FALLBACK) {
+  const normalized = normalizeRole(role, ROLE_FALLBACK);
+  return OVERDUE_ACCESS_ROLES.has(normalized);
+}
+
+async function refreshOverdueBookIds(role = ROLE_FALLBACK) {
+  if (!hasOverdueBooksAccess(role)) {
+    setOverdueBookIds([]);
+    return;
+  }
+
+  try {
+    const overdueBooks = await getOverdueBooks();
+    const overdueBookIds = Array.isArray(overdueBooks)
+      ? overdueBooks.map((book) => book?.id)
+      : [];
+    setOverdueBookIds(overdueBookIds);
+  } catch (error) {
+    console.error('Failed to preload overdue books', error);
+    setOverdueBookIds([]);
+  }
+}
+
 function applyRuleToElement(element, hide) {
   if (!hide) return;
   if (!(element instanceof Element)) return;
@@ -137,7 +176,7 @@ function applyPermissions(container = document) {
     {
       hide: !canManageBooks,
       selector:
-        '#books-add-button, #book-detail-borrower-root, #view-books button[data-action][data-book-id], #view-books thead tr > th:nth-child(6), #view-books #books-table-body tr > td:nth-child(6)',
+        '#books-add-button, #book-detail-borrower-root, #view-books button[data-action][data-book-id], #view-books thead tr > th:nth-child(6), #view-books #books-table-body tr > td:nth-child(6), #books-filter-status-menu [data-status-option="overdue"]',
     },
   ];
 
@@ -361,6 +400,7 @@ async function refreshHeaderAuthUi() {
       role: ROLE_FALLBACK,
       onboardingRequired: false,
     });
+    setOverdueBookIds([]);
     setHeaderAuthUi(false);
     applyPermissions(document);
     return;
@@ -374,6 +414,7 @@ async function refreshHeaderAuthUi() {
         role: ROLE_FALLBACK,
         onboardingRequired: false,
       });
+      setOverdueBookIds([]);
       setHeaderAuthUi(false);
       applyPermissions(document);
       return;
@@ -397,6 +438,7 @@ async function refreshHeaderAuthUi() {
       role: normalizeRole(profile?.role || resolveUserRole(data.user)),
       onboardingRequired: !isProfileSetupComplete(profile),
     });
+    await refreshOverdueBookIds(appState.role);
     fillHeaderUserFields(data.user, profile);
     applyPermissions(document);
   } catch {
@@ -405,6 +447,7 @@ async function refreshHeaderAuthUi() {
       role: ROLE_FALLBACK,
       onboardingRequired: false,
     });
+    setOverdueBookIds([]);
     setHeaderAuthUi(false);
     applyPermissions(document);
   }

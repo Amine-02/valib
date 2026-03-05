@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createBookHandler,
   deleteBookHandler,
+  generateBookLanguageHandler,
   generateBookReviewHandler,
   generateBookSummaryHandler,
   getBooksCountHandler,
@@ -29,5 +30,6 @@ router.post(
 router.post('/:id/checkin', requireRoles('admin', 'staff'), checkInBookHandler);
 router.post('/:id/ai-summary', generateBookSummaryHandler);
 router.post('/:id/ai-review', generateBookReviewHandler);
+router.post('/:id/ai-language', generateBookLanguageHandler);
 
 export default router;

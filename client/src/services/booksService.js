@@ -58,3 +58,9 @@ export function generateBookReview(bookId) {
     method: 'POST',
   });
 }
+
+export function getBookLanguage(bookId) {
+  return requestJson(`${BOOKS_API}/${bookId}/ai-language`, {
+    method: 'POST',
+  });
+}

@@ -1,4 +1,5 @@
 import {
+  callAIForLanguage,
   callAIForReview,
   callAIForSummary,
   checkInBook,
@@ -8,6 +9,7 @@ import {
   getAllBooks,
   getBooksCount,
   getBookById,
+  updateBookLanguage,
   updateBookReview,
   updateBookSummary,
   updateBook,
@@ -209,6 +211,33 @@ export async function generateBookReviewHandler(req, res) {
     res.json({
       id: updated.id,
       review: updated.review,
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function generateBookLanguageHandler(req, res) {
+  try {
+    const book = await getBookById(req.params.id);
+    const existingLanguage = String(book?.language || '').trim();
+    if (existingLanguage) {
+      return res.json({
+        id: book.id,
+        language: existingLanguage,
+      });
+    }
+
+    const language = await callAIForLanguage({
+      title: book?.title,
+      author: book?.author,
+      publishedYear: book?.published_year,
+    });
+
+    const updated = await updateBookLanguage(req.params.id, language);
+    res.json({
+      id: updated.id,
+      language: updated.language,
     });
   } catch (error) {
     handleError(res, error);

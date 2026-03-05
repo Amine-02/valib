@@ -91,10 +91,17 @@ const SIMPLE_FILTER_CONFIG = {
     labelFor: (value) => {
       if (value === 'available') return 'Available';
       if (value === 'borrowed') return 'Borrowed';
+      if (value === 'overdue') return 'Overdue';
       return 'All status';
     },
   },
 };
+const ALLOWED_STATUS_FILTERS = new Set([
+  '',
+  'available',
+  'borrowed',
+  'overdue',
+]);
 
 function el(key) {
   return getById(IDS[key]);
@@ -261,7 +268,10 @@ function setFilterValues(state, values, { yearMin, yearMax }) {
     fallback: String(yearMax),
   });
   const nextGenre = normalizeLowerTrim(genre);
-  const nextStatus = normalizeLowerTrim(status);
+  const normalizedStatus = normalizeLowerTrim(status);
+  const nextStatus = ALLOWED_STATUS_FILTERS.has(normalizedStatus)
+    ? normalizedStatus
+    : '';
 
   const changed =
     nextYearFrom !== state.yearFrom ||

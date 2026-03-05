@@ -1,4 +1,5 @@
 import {
+  getBookLanguage,
   generateBookReview,
   generateBookSummary,
   getBookById,
@@ -10,6 +11,7 @@ import { setupBooksController } from './controller.js';
 import { setupBooksModals } from './modals.js';
 import { getById, queryAll } from '/src/utils/dom.js';
 import { normalizeYearRange } from '/src/utils/filter.js';
+import { appState } from '/src/state.js';
 import {
   clearLoaderState,
   showCenteredLoader,
@@ -38,6 +40,7 @@ const IDS = {
   detailStatus: 'book-detail-status',
   detailGenre: 'book-detail-genre',
   detailPublishedYear: 'book-detail-published-year',
+  detailLanguage: 'book-detail-language',
   detailBorrowerRoot: 'book-detail-borrower-root',
   detailBorrowerName: 'book-detail-borrower-name',
   detailBorrowerPhone: 'book-detail-borrower-phone',
@@ -58,6 +61,7 @@ const CONFIG = {
   yearMin: 1500,
   yearMax: 2026,
 };
+const OVERDUE_FILTER_VALUE = 'overdue';
 
 const state = {
   page: 1,
@@ -89,6 +93,12 @@ const AI_REVIEWS_LOADER_CLASSES = [
   'justify-center',
 ];
 const AI_RATING_LOADER_CLASSES = ['min-h-6', 'inline-flex', 'items-center'];
+const LANGUAGE_LOADER_CLASSES = [
+  'inline-flex',
+  'items-center',
+  'justify-center',
+  'min-w-14',
+];
 
 function getBooksScrollContainer() {
   const view = el('booksView');
@@ -163,6 +173,75 @@ function getActiveSearchQuery() {
   return String(state.searchQuery ?? '').trim();
 }
 
+function normalizeBookId(bookId) {
+  return String(bookId || '').trim();
+}
+
+function getOverdueBookIdSet() {
+  const ids = Array.isArray(appState.overdueBookIds)
+    ? appState.overdueBookIds
+    : [];
+  return new Set(ids.map((bookId) => normalizeBookId(bookId)).filter(Boolean));
+}
+
+async function getOverdueBooksByIds() {
+  const overdueBookIds = [...getOverdueBookIdSet()];
+  if (!overdueBookIds.length) return [];
+
+  const books = await Promise.all(
+    overdueBookIds.map(async (bookId) => {
+      try {
+        return await getBookById(bookId);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return books.filter(Boolean);
+}
+
+function filterBooksByYearAndGenre(books) {
+  if (!Array.isArray(books)) return [];
+
+  const { from: queryYearFrom, to: queryYearTo } = normalizeYearRange(
+    state.yearFrom,
+    state.yearTo,
+    { min: CONFIG.yearMin, max: CONFIG.yearMax, sort: true }
+  );
+  const yearFrom = queryYearFrom ? Number(queryYearFrom) : null;
+  const yearTo = queryYearTo ? Number(queryYearTo) : null;
+  const genre = String(state.genre || '')
+    .trim()
+    .toLowerCase();
+
+  return books.filter((book) => {
+    const publishedYear = Number(book?.published_year);
+    if (Number.isFinite(yearFrom) && Number.isFinite(publishedYear)) {
+      if (publishedYear < yearFrom) return false;
+    }
+    if (Number.isFinite(yearTo) && Number.isFinite(publishedYear)) {
+      if (publishedYear > yearTo) return false;
+    }
+    if (genre) {
+      const bookGenre = String(book?.genre || '')
+        .trim()
+        .toLowerCase();
+      if (!bookGenre.includes(genre)) return false;
+    }
+    return true;
+  });
+}
+
+function sortBooksByTitle(books) {
+  if (!Array.isArray(books)) return [];
+  return [...books].sort((a, b) =>
+    String(a?.title || '').localeCompare(String(b?.title || ''), undefined, {
+      sensitivity: 'base',
+    })
+  );
+}
+
 function updatePaginationUi(rowCount = 0) {
   const meta = el('paginationMeta');
   const prevButton = el('prevPage');
@@ -217,6 +296,32 @@ function toGenreLabel(genre) {
   return toTitleCase(value.replaceAll('_', ' '));
 }
 
+function toLanguageLabel(language) {
+  const value = String(language || '')
+    .trim()
+    .toLowerCase();
+  if (!value) return 'N/A';
+  const firstWord = value.split(/\s+/)[0].replace(/[^a-z]/g, '');
+  if (!firstWord) return 'N/A';
+  return firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
+}
+
+function setLanguageValue(language) {
+  const languageEl = el('detailLanguage');
+  if (!languageEl) return;
+  clearLoaderState(languageEl, LANGUAGE_LOADER_CLASSES);
+  languageEl.textContent = toLanguageLabel(language);
+}
+
+function setAiLanguageLoading() {
+  const languageEl = el('detailLanguage');
+  if (!languageEl) return;
+  showCenteredLoader(languageEl, {
+    sizeClass: 'h-3 w-3',
+    targetClasses: LANGUAGE_LOADER_CLASSES,
+  });
+}
+
 function resetBookDetail() {
   const empty = el('detailEmpty');
   const panel = el('detailPanel');
@@ -228,6 +333,7 @@ function resetBookDetail() {
   if (borrowerRoot) borrowerRoot.classList.add('hidden');
   if (borrowerName) borrowerName.textContent = 'N/A';
   if (borrowerPhone) borrowerPhone.textContent = 'N/A';
+  setLanguageValue('');
   resetAiDetail();
 }
 
@@ -477,6 +583,18 @@ async function resolveBookReview(book, bookId, requestId) {
   }
 }
 
+async function resolveBookLanguage(bookId, requestId) {
+  try {
+    const response = await getBookLanguage(bookId);
+    if (!isActiveDetailRequest(bookId, requestId)) return;
+    setLanguageValue(response?.language);
+  } catch (error) {
+    console.error('Failed to resolve book language', error);
+    if (!isActiveDetailRequest(bookId, requestId)) return;
+    setLanguageValue('');
+  }
+}
+
 function animateScrollTo(container, targetY, durationMs = 420) {
   if (detailScrollFrameId) {
     window.cancelAnimationFrame(detailScrollFrameId);
@@ -592,6 +710,7 @@ async function renderBookDetail(book) {
   syncBorrowerDetails({ status, borrowerName, borrowerPhone });
   setBookDetailCover(book.cover_url);
 
+  setAiLanguageLoading();
   setAiSummaryLoading();
   setAiReviewLoading();
 
@@ -635,10 +754,12 @@ async function renderBookDetail(book) {
     await Promise.all([
       resolveBookSummary(freshBook, id, requestId),
       resolveBookReview(freshBook, id, requestId),
+      resolveBookLanguage(id, requestId),
     ]);
   } catch (error) {
     console.error('Failed to load enriched book detail', error);
     if (!isActiveDetailRequest(id, requestId)) return;
+    setLanguageValue('');
     renderAiSummary('');
     renderAiRating(4);
     renderAiReviews([]);
@@ -828,7 +949,7 @@ function buildActiveFilters() {
     filters.genre = state.genre;
   }
 
-  if (state.status) {
+  if (state.status && state.status !== OVERDUE_FILTER_VALUE) {
     filters.status = state.status;
   }
 
@@ -898,26 +1019,41 @@ async function loadBooksPage(pageNumber) {
   let rowCount = 0;
 
   try {
-    const [countResult, pageBooksResult] = await Promise.all([
-      getBooksCount(buildCountQuery()),
-      getBooks(buildBooksQuery(requestedPage)),
-    ]);
+    let total = 0;
+    let books = [];
 
-    const total = Number(countResult?.count) || 0;
-    const totalPages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
+    if (state.status === OVERDUE_FILTER_VALUE) {
+      let filteredOverdueBooks = await getOverdueBooksByIds();
+      filteredOverdueBooks = filterBooksByYearAndGenre(filteredOverdueBooks);
+      filteredOverdueBooks = filterBooksBySearch(filteredOverdueBooks);
+      filteredOverdueBooks = sortBooksByTitle(filteredOverdueBooks);
 
-    state.total = total;
-    state.totalPages = totalPages;
-    state.page = Math.min(requestedPage, totalPages);
+      total = filteredOverdueBooks.length;
+      state.total = total;
+      state.totalPages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
+      state.page = total === 0 ? 1 : Math.min(requestedPage, state.totalPages);
 
-    let books = Array.isArray(pageBooksResult) ? pageBooksResult : [];
+      const start = (state.page - 1) * CONFIG.pageSize;
+      books = filteredOverdueBooks.slice(start, start + CONFIG.pageSize);
+    } else {
+      const [countResult, pageBooksResult] = await Promise.all([
+        getBooksCount(buildCountQuery()),
+        getBooks(buildBooksQuery(requestedPage)),
+      ]);
 
-    if (state.page !== requestedPage) {
-      const clampedBooks = await getBooks(buildBooksQuery(state.page));
-      books = Array.isArray(clampedBooks) ? clampedBooks : [];
+      total = Number(countResult?.count) || 0;
+      state.total = total;
+      state.totalPages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
+      state.page = Math.min(requestedPage, state.totalPages);
+      books = Array.isArray(pageBooksResult) ? pageBooksResult : [];
+
+      if (state.page !== requestedPage) {
+        const clampedBooks = await getBooks(buildBooksQuery(state.page));
+        books = Array.isArray(clampedBooks) ? clampedBooks : [];
+      }
+
+      books = filterBooksBySearch(books);
     }
-
-    books = filterBooksBySearch(books);
 
     rowCount = books.length;
     const activeSearchQuery = getActiveSearchQuery();
@@ -934,11 +1070,22 @@ async function loadBooksPage(pageNumber) {
     }
 
     if (activeSearchQuery) {
+      const contextLabel =
+        state.status === OVERDUE_FILTER_VALUE
+          ? 'overdue results (21+ days past checkout)'
+          : 'results';
       setMeta(
-        `Showing results for "${activeSearchQuery}" (${formatNumber(total)} books).`
+        `Showing ${contextLabel} for "${activeSearchQuery}" (${formatNumber(total)} books).`
       );
     } else {
-      setMeta(`Track and manage ${formatNumber(total)} books (A-Z).`);
+      if (state.status === OVERDUE_FILTER_VALUE) {
+        const label = total === 1 ? 'book' : 'books';
+        setMeta(
+          `Showing ${formatNumber(total)} overdue ${label} (21+ days past checkout).`
+        );
+      } else {
+        setMeta(`Track and manage ${formatNumber(total)} books (A-Z).`);
+      }
     }
 
     setRows(books);

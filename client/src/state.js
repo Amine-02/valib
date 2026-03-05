@@ -3,4 +3,5 @@ export const appState = {
   isAuthenticated: false,
   role: 'viewer',
   onboardingRequired: false,
+  overdueBookIds: [],
 };

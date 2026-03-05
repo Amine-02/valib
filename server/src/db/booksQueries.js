@@ -27,6 +27,8 @@ const SUMMARY_SYSTEM_INSTRUCTION =
   'You are a book assistant. Return exactly two short plain-text phrases summarizing the book. No bullets, no markdown.';
 const REVIEW_SYSTEM_INSTRUCTION =
   'You are a concise literary reviewer. Return only valid JSON with score and quotes. No markdown. Every quote string must be wrapped with double quote characters.';
+const LANGUAGE_SYSTEM_INSTRUCTION =
+  'You are a language detector for books. Return exactly one lowercase word for the likely language. No punctuation, no extra text.';
 const DEFAULT_REVIEW = {
   score: 4,
   quotes: [
@@ -34,6 +36,7 @@ const DEFAULT_REVIEW = {
     '"A solid read with memorable moments."',
   ],
 };
+const DEFAULT_LANGUAGE = 'english';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 function applyBookSorting(query, filters = {}) {
@@ -212,6 +215,21 @@ export async function updateBookReview(bookId, review) {
   return data;
 }
 
+export async function updateBookLanguage(bookId, language) {
+  const { data, error } = await supabaseAdmin
+    .from('books')
+    .update({
+      language: normalizeLanguage(language),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', bookId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteBook(bookId) {
   const { data, error } = await supabaseAdmin
     .from('books')
@@ -327,6 +345,15 @@ function normalizeReviewQuotes(quotes) {
   if (cleaned.length === 2) return cleaned;
   if (cleaned.length === 1) return [cleaned[0], DEFAULT_REVIEW.quotes[1]];
   return [...DEFAULT_REVIEW.quotes];
+}
+
+function normalizeLanguage(language) {
+  const firstWord = String(language || '')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)[0];
+  const cleaned = firstWord.replace(/[^a-z]/g, '');
+  return cleaned || DEFAULT_LANGUAGE;
 }
 
 function parseJsonSafe(raw) {
@@ -461,5 +488,45 @@ export async function callAIForReview(
   } catch (error) {
     console.error('Failed to generate AI review', error);
     return { ...DEFAULT_REVIEW };
+  }
+}
+
+export async function callAIForLanguage(
+  { title, author, publishedYear },
+  maxRetries = 3
+) {
+  if (!process.env.GEMINI_API_KEY) {
+    return DEFAULT_LANGUAGE;
+  }
+
+  const prompt = [
+    'Detect the most likely language of this book.',
+    'Return only one lowercase word (example: english, french, arabic).',
+    `Title: ${String(title || '').trim() || 'Unknown'}`,
+    `Author: ${String(author || '').trim() || 'Unknown'}`,
+    `Published year: ${String(publishedYear || '').trim() || 'Unknown'}`,
+  ].join('\n');
+
+  try {
+    const response = await generateWithRetry(
+      () => ({
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction: LANGUAGE_SYSTEM_INSTRUCTION,
+          temperature: 0.1,
+          maxOutputTokens: 10,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.MINIMAL,
+          },
+        },
+      }),
+      maxRetries
+    );
+
+    return normalizeLanguage(response?.text);
+  } catch (error) {
+    console.error('Failed to generate AI language', error);
+    return DEFAULT_LANGUAGE;
   }
 }
