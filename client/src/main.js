@@ -1,7 +1,10 @@
 import sidebarTemplate from '/src/components/sidebar.html?raw';
 import headerTemplate from '/src/components/header.html?raw';
 import { ROUTE_CONFIG } from '/src/configs/routes.js';
-import { getSessionProfile } from '/src/services/authService.js';
+import {
+  getSessionProfile,
+  purgeUnauthorizedSelf,
+} from '/src/services/authService.js';
 import { getOverdueBooks } from '/src/services/transactionsService.js';
 import { appState } from '/src/state.js';
 import { clearActiveUserRole, setActiveUserRole } from '/src/utils/role.js';
@@ -322,6 +325,25 @@ async function getSessionAccessToken(client) {
   }
 }
 
+async function purgeUnauthorizedSession(client) {
+  if (!client) return;
+
+  const accessToken = await getSessionAccessToken(client);
+  if (accessToken) {
+    try {
+      await purgeUnauthorizedSelf(accessToken);
+    } catch {
+      // Best effort cleanup; sign-out still prevents looping.
+    }
+  }
+
+  try {
+    await client.auth.signOut();
+  } catch {
+    // Ignore sign-out errors here.
+  }
+}
+
 function setHeaderUserDropdownOpen(open) {
   const trigger = document.getElementById('header-user-trigger');
   const menu = document.getElementById('header-user-dropdown');
@@ -445,6 +467,21 @@ async function refreshHeaderAuthUi() {
     }
 
     const resolvedProfile = profile === PROFILE_LOOKUP_PENDING ? null : profile;
+
+    if (onboardingChecked && !resolvedProfile) {
+      await purgeUnauthorizedSession(client);
+      setAccessState({
+        isAuthenticated: false,
+        role: ROLE_FALLBACK,
+        onboardingRequired: false,
+        onboardingChecked: false,
+      });
+      setOverdueBookIds([]);
+      setHeaderAuthUi(false);
+      applyPermissions(document);
+      return;
+    }
+
     setAccessState({
       isAuthenticated: true,
       role: normalizeRole(resolvedProfile?.role || resolveUserRole(data.user)),
